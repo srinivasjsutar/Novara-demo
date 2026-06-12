@@ -1,0 +1,38 @@
+# robots.txt for https://www.novaranatureestates.com
+
+# --- Google ---
+User-agent: Googlebot
+Disallow:
+
+# Google's AI/Gemini training crawler (separate from search indexing)
+User-agent: Google-Extended
+Disallow:
+
+# --- AI crawlers ---
+User-agent: GPTBot
+Disallow:
+
+User-agent: OAI-SearchBot
+Disallow:
+
+User-agent: ChatGPT-User
+Disallow:
+
+User-agent: ClaudeBot
+Disallow:
+
+User-agent: PerplexityBot
+Disallow:
+
+User-agent: CCBot
+Disallow:
+
+User-agent: Applebot-Extended
+Disallow:
+
+# --- Everyone else ---
+User-agent: *
+Disallow:
+
+# Sitemap location
+Sitemap: https://www.novaranatureestates.com/sitemap.xml
