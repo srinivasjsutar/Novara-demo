@@ -39,18 +39,22 @@ const clearStoredSession = () => {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [token, setToken]     = useState(null);
-  const [loading, setLoading] = useState(true);
+  // We start logged-OUT on both the server and the very first client render.
+  // This keeps SSR markup and the first hydration pass identical (no mismatch),
+  // and — crucially — the login screen is shown immediately instead of being
+  // hidden behind a "loading" spinner that depends on an effect firing.
+  const [user, setUser]   = useState(null);
+  const [token, setToken] = useState(null);
 
-  // On mount: restore session from localStorage
+  // After mount, restore any saved session. If this effect is delayed or never
+  // runs, the worst case is that the user simply sees the login screen (and can
+  // log in normally) — never an endless spinner.
   useEffect(() => {
     const session = getStoredSession();
     if (session?.user && session?.token) {
       setUser(session.user);
       setToken(session.token);
     }
-    setLoading(false);
   }, []);
 
   // ── login — checks hardcoded USERS list, no backend call ─────────────────
@@ -83,7 +87,7 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     token,
-    loading,
+    loading: false, // auth is synchronous (hardcoded) — nothing to wait for
     login,
     logout,
     isAuthenticated: !!token && !!user,
