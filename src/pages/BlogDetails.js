@@ -169,9 +169,18 @@ const BrochureModal = ({ isOpen, onClose }) => {
 
 export default function BlogDetail({ vikeSlug }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   const slug = vikeSlug;
   const blog = BLOGS.find((b) => b.slug === slug);
+
+  // Pull a YouTube video id from any standard URL form (for the featured video)
+  const getYouTubeId = (url = "") => {
+    if (!url) return null;
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([^&\n?#]+)/);
+    return m ? m[1] : null;
+  };
+  const videoId = getYouTubeId(blog?.videoUrl);
 
   const sections = blog?.sections?.length
     ? blog.sections
@@ -286,14 +295,57 @@ export default function BlogDetail({ vikeSlug }) {
               <span className="text-slate-500 line-clamp-1 max-w-[420px] sm:max-w-[600px]">{blog.title}</span>
             </div>
 
-            {/* ✅ FIXED: Hero image now actually renders */}
-            <div className="mt-5 rounded-2xl overflow-hidden border border-slate-100 bg-slate-100">
-              <img
-                src={blog.heroImage || blog.image}
-                alt={blog.title}
-                className="w-full h-auto object-cover"
-              />
-            </div>
+            {/* Hero / featured image (acts as a video thumbnail when a video URL is set) */}
+            <figure className="mt-5">
+              <div className="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-100 group">
+                <img
+                  src={blog.heroImage || blog.image}
+                  alt={blog.imageAlt || blog.title}
+                  title={blog.imageTitle || undefined}
+                  className="w-full h-auto object-cover"
+                />
+                {videoId && (
+                  <button
+                    type="button"
+                    onClick={() => setVideoOpen(true)}
+                    aria-label="Play video"
+                    className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition-colors"
+                  >
+                    <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                      <svg viewBox="0 0 24 24" fill="#E3A600" width="30" height="30"><path d="M8 5v14l11-7z" /></svg>
+                    </span>
+                  </button>
+                )}
+              </div>
+              {blog.imageCaption && (
+                <figcaption className="mt-2 text-[13px] text-slate-500 text-center">{blog.imageCaption}</figcaption>
+              )}
+            </figure>
+
+            {/* Featured video lightbox */}
+            {videoOpen && videoId && (
+              <div
+                className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+                style={{ background: "rgba(0,0,0,0.85)" }}
+                onClick={() => setVideoOpen(false)}
+              >
+                <div className="relative w-full max-w-3xl" style={{ aspectRatio: "16/9" }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setVideoOpen(false)}
+                    className="absolute -top-9 right-0 text-white text-sm font-semibold hover:text-[#E3A600]"
+                  >
+                    ✕ Close
+                  </button>
+                  <iframe
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+                    allow="autoplay; fullscreen"
+                    allowFullScreen
+                    className="w-full h-full rounded-xl border-0"
+                    title="Featured video"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ── Content sections ── */}
             <div className="mt-6 space-y-5">

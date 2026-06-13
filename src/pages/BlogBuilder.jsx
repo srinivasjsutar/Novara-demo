@@ -873,12 +873,9 @@ function BlogEditor({ editingBlog, onBack }) {
   const jsonLdPreview = useMemo(
     () => schemaToJsonLd({
       slug: meta.slug || slugify(meta.title),
-      title: schemaOverrides.headline || meta.title,
-      headline: schemaOverrides.headline || meta.title,
-      description: schemaOverrides.description || meta.description,
+      title: meta.title, headline: meta.title, description: meta.description,
       heroImage: meta.heroImage, image: meta.heroImage, date: meta.date,
-      author: schemaOverrides.authorName || meta.author,
-      schemaType, faqs,
+      author: meta.author, schemaType, faqs, schemaOverrides,
     }),
     [meta.slug, meta.title, meta.description, meta.heroImage, meta.date, meta.author, schemaType, faqs, schemaOverrides],
   );

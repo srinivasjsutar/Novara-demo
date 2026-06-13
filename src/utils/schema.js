@@ -22,20 +22,33 @@ const toIso = (d) => {
 };
 
 // Returns an array of JSON-LD objects (Article/BlogPosting [+ FAQPage]).
+// Per-field overrides from the editor (blog.schemaOverrides) take precedence
+// over the values auto-derived from the post.
 export function buildBlogSchema(blog = {}) {
+  const o = blog.schemaOverrides || {};
   const url = SITE_BASE + (blog.slug || "");
   const img = blog.heroImage || blog.image || "";
-  const date = toIso(blog.date);
+  const rawDate = o.datePublished || blog.date;
+  const date = toIso(rawDate) || rawDate || undefined;
+
+  const publisher = {
+    "@type": "Organization",
+    name: o.publisherName || PUBLISHER.name,
+    logo: {
+      "@type": "ImageObject",
+      url: o.publisherLogo || PUBLISHER.logo.url,
+    },
+  };
 
   const article = {
     "@context": "https://schema.org",
     "@type": blog.schemaType || "BlogPosting",
-    headline: blog.headline || blog.title || "",
-    description: blog.description || "",
+    headline: o.headline || blog.headline || blog.title || "",
+    description: o.description || blog.description || "",
     ...(img ? { image: [img] } : {}),
     ...(date ? { datePublished: date, dateModified: date } : {}),
-    author: { "@type": "Organization", name: blog.author || PUBLISHER.name },
-    publisher: PUBLISHER,
+    author: { "@type": "Organization", name: o.authorName || blog.author || PUBLISHER.name },
+    publisher,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };
 
