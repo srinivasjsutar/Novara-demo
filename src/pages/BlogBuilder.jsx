@@ -509,14 +509,45 @@ function BlogEditor({ editingBlog, onBack }) {
   // ── Rich-text commands ──────────────────────────────────────────────────────
   const focusBody = () => { if (bodyRef.current) bodyRef.current.focus(); };
 
+  // The toolbar controls (especially the native <select>) steal focus from the
+  // editor, which collapses/loses the caret — so execCommand would then run
+  // against nothing (headings wouldn't stick, unlink would have no target).
+  // We continuously remember the last caret/selection that was inside the
+  // editor and restore it right before running any command.
+  const selectionInsideBody = (range) =>
+    bodyRef.current && range && bodyRef.current.contains(range.commonAncestorContainer);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0);
+      if (selectionInsideBody(r)) savedSelection.current = r.cloneRange();
+    }
+  };
+  const restoreSelection = () => {
+    const sel = window.getSelection();
+    if (savedSelection.current && sel) {
+      try { sel.removeAllRanges(); sel.addRange(savedSelection.current); } catch (_) {}
+    }
+  };
+
+  useEffect(() => {
+    const handler = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && selectionInsideBody(sel.getRangeAt(0))) {
+        savedSelection.current = sel.getRangeAt(0).cloneRange();
+      }
+    };
+    document.addEventListener("selectionchange", handler);
+    return () => document.removeEventListener("selectionchange", handler);
+  }, []);
+
   const exec = useCallback((cmd, value = null) => {
     focusBody();
+    restoreSelection();
     try { document.execCommand("styleWithCSS", false, true); } catch (_) {}
-    if (cmd === "formatBlock") {
-      document.execCommand("formatBlock", false, value.toUpperCase());
-    } else {
-      document.execCommand(cmd, false, value);
-    }
+    document.execCommand(cmd, false, value);
+    saveSelection();
     syncFormatState();
   }, []);
 
@@ -527,31 +558,110 @@ function BlogEditor({ editingBlog, onBack }) {
     } catch (_) {}
   };
 
-  // Format dropdown → formatBlock
-  useEffect(() => {
-    // applied via onChange handler instead to avoid loops
-  }, [format]);
+  // Guarantee the editor's text always lives inside a block element. Typing into
+  // a brand-new (empty) contentEditable produces a bare text node with no block
+  // wrapper, and formatBlock can't turn a bare text node into a heading — it
+  // wipes it and the format never sticks. Seeding a <p> (and making Enter create
+  // <p>) keeps headings working.
+  const ensureEditable = () => {
+    const el = bodyRef.current;
+    if (!el) return;
+    try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (_) {}
+    const html = el.innerHTML.trim();
+    if (html === "" || html === "<br>") {
+      el.innerHTML = "<p><br></p>";
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.selectNodeContents(el.firstChild);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      savedSelection.current = r.cloneRange();
+    }
+  };
+
+  const onEditorFocus = () => { ensureEditable(); };
 
   const handleFormatChange = (val) => {
     setFormat(val);
-    exec("formatBlock", val);
+    const el = bodyRef.current;
+    if (!el) return;
+    el.focus();
+    ensureEditable();
+
+    // Pick the block to convert from the live selection, falling back to the
+    // last caret we saved while the editor had focus.
+    const sel = window.getSelection();
+    let range = (sel && sel.rangeCount && selectionInsideBody(sel.getRangeAt(0)))
+      ? sel.getRangeAt(0)
+      : savedSelection.current;
+    if (!range) return;
+
+    // Find the top-level block (direct child of the editor) holding the caret.
+    let block = range.startContainer;
+    block = block.nodeType === 1 ? block : block.parentElement;
+    while (block && block.parentElement !== el) block = block.parentElement;
+    if (!block || block.parentElement !== el) {
+      document.execCommand("formatBlock", false, val.toUpperCase());
+      syncFormatState();
+      return;
+    }
+
+    // Convert by swapping the tag directly — deterministic, immune to the
+    // focus/selection juggling that execCommand("formatBlock") depends on.
+    const newEl = document.createElement(val);
+    while (block.firstChild) newEl.appendChild(block.firstChild);
+    if (!newEl.firstChild) newEl.appendChild(document.createElement("br"));
+    block.replaceWith(newEl);
+
+    // keep the caret at the end of the converted block so typing continues in it
+    const r = document.createRange();
+    r.selectNodeContents(newEl);
+    r.collapse(false);
+    if (sel) { sel.removeAllRanges(); sel.addRange(r); }
+    savedSelection.current = r.cloneRange();
+    syncFormatState();
   };
 
   const onLink = () => {
+    focusBody();
+    restoreSelection();
     const url = window.prompt("Enter the URL (https://…)");
     if (!url) return;
-    focusBody();
+    restoreSelection(); // the prompt dialog drops the selection — put it back
     document.execCommand("createLink", false, url);
-    // colour newly created links to match the brand gold
     if (bodyRef.current) {
-      bodyRef.current.querySelectorAll('a[href="' + url + '"]').forEach((a) => {
+      bodyRef.current.querySelectorAll("a:not([data-styled])").forEach((a) => {
         a.style.color = "#E3A600";
         a.setAttribute("target", "_blank");
         a.setAttribute("rel", "noopener noreferrer");
+        a.setAttribute("data-styled", "1");
       });
     }
+    saveSelection();
   };
-  const onUnlink = () => { focusBody(); document.execCommand("unlink"); };
+
+  const onUnlink = () => {
+    focusBody();
+    restoreSelection();
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      // If the caret is just inside a link (nothing highlighted), select the
+      // whole <a> first so execCommand("unlink") has something to remove.
+      let node = sel.anchorNode;
+      let a = node ? (node.nodeType === 1 ? node : node.parentElement) : null;
+      while (a && a !== bodyRef.current && a.tagName !== "A") a = a.parentElement;
+      if (a && a.tagName === "A") {
+        const range = document.createRange();
+        range.selectNode(a);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+    document.execCommand("unlink");
+    saveSelection();
+    syncFormatState();
+  };
 
   // ── Image insert (content) ──────────────────────────────────────────────────
   const onImageClick = () => {
@@ -878,7 +988,7 @@ function BlogEditor({ editingBlog, onBack }) {
                   contentEditable
                   suppressContentEditableWarning
                   data-placeholder="Start writing your post…"
-                  dangerouslySetInnerHTML={{ __html: initialHtml.current }}
+                  onFocus={onEditorFocus}
                   onKeyUp={syncFormatState}
                   onMouseUp={syncFormatState}
                 />
