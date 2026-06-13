@@ -1024,6 +1024,60 @@ function BlogEditor({ editingBlog, onBack }) {
 
               {/* hidden file inputs */}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleContentImage(e.target.files[0])} />
+
+              {/* SCHEMA / STRUCTURED DATA BOX */}
+              <div className="meta-box mt-5">
+                <button className="meta-box-head w-full" onClick={() => setShowSchema((v) => !v)}>
+                  <span className="meta-box-title flex items-center gap-1.5"><Code2 size={13} /> Schema (structured data)</span>
+                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSchema ? "rotate-180" : ""}`} />
+                </button>
+                {showSchema && (
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                      <Field label="Article schema type">
+                        <select value={schemaType} onChange={(e) => setSchemaType(e.target.value)} className="wp-input">
+                          <option value="BlogPosting">BlogPosting (default)</option>
+                          <option value="Article">Article</option>
+                          <option value="NewsArticle">NewsArticle</option>
+                        </select>
+                      </Field>
+                      <p className="text-[12px] text-[#646970] leading-relaxed sm:pt-5">
+                        Article fields (headline, description, image, date, author) are filled
+                        automatically from the post. Add FAQs for rich FAQ results.
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[12px] font-semibold text-[#50575e]">FAQ schema</span>
+                        <button onClick={addFaq} className="wp-secondary flex items-center gap-1"><Plus size={12} /> Add Q&amp;A</button>
+                      </div>
+                      {faqs.length === 0 && <p className="text-[12px] text-[#646970]">No FAQs added.</p>}
+                      <div className="space-y-2">
+                        {faqs.map((f, i) => (
+                          <div key={i} className="border border-[#dcdcde] rounded p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-[#787c82]">Q{i + 1}</span>
+                              <button onClick={() => removeFaq(i)} className="text-[12px] text-[#b32d2e] hover:underline">Remove</button>
+                            </div>
+                            <input value={f.q} onChange={(e) => updateFaq(i, "q", e.target.value)} placeholder="Question" className="wp-input" />
+                            <textarea rows={2} value={f.a} onChange={(e) => updateFaq(i, "a", e.target.value)} placeholder="Answer" className="wp-input resize-none" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <button onClick={() => setShowJsonLd((v) => !v)} className="wp-link flex items-center gap-1">
+                        {showJsonLd ? "Hide" : "View"} generated JSON-LD
+                      </button>
+                      {showJsonLd && (
+                        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[11px] leading-relaxed p-3 row-scroll whitespace-pre-wrap">{jsonLdPreview}</pre>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* RIGHT SIDEBAR — meta boxes */}
@@ -1111,58 +1165,6 @@ function BlogEditor({ editingBlog, onBack }) {
                       <Field label="Author"><input value={meta.author} onChange={(e) => setMeta((p) => ({ ...p, author: e.target.value }))} className="wp-input" /></Field>
                     </div>
                     <Field label="Tags (comma-separated)"><input value={meta.tags} onChange={(e) => setMeta((p) => ({ ...p, tags: e.target.value }))} placeholder="Organic, Eco" className="wp-input" /></Field>
-                  </div>
-                )}
-              </div>
-
-              {/* SCHEMA / STRUCTURED DATA BOX */}
-              <div className="meta-box">
-                <button className="meta-box-head w-full" onClick={() => setShowSchema((v) => !v)}>
-                  <span className="meta-box-title flex items-center gap-1.5"><Code2 size={13} /> Schema (structured data)</span>
-                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSchema ? "rotate-180" : ""}`} />
-                </button>
-                {showSchema && (
-                  <div className="p-3 space-y-3">
-                    <Field label="Article schema type">
-                      <select value={schemaType} onChange={(e) => setSchemaType(e.target.value)} className="wp-input">
-                        <option value="BlogPosting">BlogPosting (default)</option>
-                        <option value="Article">Article</option>
-                        <option value="NewsArticle">NewsArticle</option>
-                      </select>
-                    </Field>
-                    <p className="text-[11px] text-[#646970] leading-relaxed">
-                      Article fields (headline, description, image, date, author) are filled
-                      automatically from the post. Add FAQs below for rich FAQ results.
-                    </p>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-semibold text-[#50575e]">FAQ schema</span>
-                        <button onClick={addFaq} className="wp-link flex items-center gap-1"><Plus size={12} /> Add Q&amp;A</button>
-                      </div>
-                      {faqs.length === 0 && <p className="text-[11px] text-[#646970]">No FAQs added.</p>}
-                      <div className="space-y-2">
-                        {faqs.map((f, i) => (
-                          <div key={i} className="border border-[#dcdcde] rounded p-2 space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-semibold text-[#787c82]">Q{i + 1}</span>
-                              <button onClick={() => removeFaq(i)} className="text-[11px] text-[#b32d2e] hover:underline">Remove</button>
-                            </div>
-                            <input value={f.q} onChange={(e) => updateFaq(i, "q", e.target.value)} placeholder="Question" className="wp-input" />
-                            <textarea rows={2} value={f.a} onChange={(e) => updateFaq(i, "a", e.target.value)} placeholder="Answer" className="wp-input resize-none" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <button onClick={() => setShowJsonLd((v) => !v)} className="wp-link flex items-center gap-1">
-                        {showJsonLd ? "Hide" : "View"} generated JSON-LD
-                      </button>
-                      {showJsonLd && (
-                        <pre className="mt-2 max-h-60 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[10px] leading-relaxed p-2 row-scroll whitespace-pre-wrap">{jsonLdPreview}</pre>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
