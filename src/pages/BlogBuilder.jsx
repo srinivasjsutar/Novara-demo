@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BLOGS } from "../data/blogs";
-import { schemaToJsonLd } from "../utils/schema";
+import { SCHEMA_DEFS, initSchemas, normalizeSchemas, schemaGraphToString, parseJsonLd } from "../utils/schema";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API_BASE =
@@ -478,8 +478,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const [editingDate, setEditingDate] = useState(false);
   const [showSchema, setShowSchema] = useState(true);
   const [showJsonLd, setShowJsonLd] = useState(false);
-  const [schemaType, setSchemaType] = useState("BlogPosting");
-  const [faqs, setFaqs] = useState([]); // [{ q, a }]
+  const [schemas, setSchemas] = useState(() => initSchemas());
   const [videoPopupOpen, setVideoPopupOpen] = useState(false);
 
   const [publishStatus, setPublishStatus] = useState(null);
@@ -494,9 +493,6 @@ function BlogEditor({ editingBlog, onBack }) {
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     heroImage: "", imageAlt: "", imageTitle: "", imageCaption: "", imageDescription: "", videoUrl: "", tags: "",
   });
-
-  // Editable schema key-value overrides
-  const [schemaOverrides, setSchemaOverrides] = useState({});
 
   const editingBlogId = useRef(editingBlog?.id ?? null);
   const editingBlogOriginalSlug = useRef(editingBlog?.slug ?? "");
@@ -529,9 +525,7 @@ function BlogEditor({ editingBlog, onBack }) {
       videoUrl:         editingBlog.videoUrl         || "",
       tags:             (editingBlog.tags || []).join(", "),
     });
-    setSchemaType(editingBlog.schemaType || "BlogPosting");
-    setSchemaOverrides(editingBlog.schemaOverrides || {});
-    setFaqs(Array.isArray(editingBlog.faqs) ? editingBlog.faqs : []);
+    setSchemas(normalizeSchemas(editingBlog.schemas));
     const html = sectionsToHtml(editingBlog.sections || []);
     if (bodyRef.current) bodyRef.current.innerHTML = html;
   }, [editingBlog]);
@@ -745,10 +739,7 @@ function BlogEditor({ editingBlog, onBack }) {
       imageDescription: meta.imageDescription,
       videoUrl: meta.videoUrl,
       tags: tagsArr, sections,
-      schemaType,
-      schemaOverrides,
-      faqs: faqs.map((f) => ({ q: (f.q || "").trim(), a: (f.a || "").trim() }))
-                .filter((f) => f.q && f.a),
+      schemas,
     };
   };
 
@@ -848,37 +839,39 @@ function BlogEditor({ editingBlog, onBack }) {
   const saveDraft = () => {
     const key = currentDraftKey || `draft_${Date.now()}`;
     const body = bodyRef.current ? bodyRef.current.innerHTML : "";
-    localStorage.setItem(key, JSON.stringify({ meta, body, schemaType, schemaOverrides, faqs, savedAt: new Date().toISOString() }));
+    localStorage.setItem(key, JSON.stringify({ meta, body, schemas, savedAt: new Date().toISOString() }));
     setCurrentDraftKey(key); loadDrafts();
     setPublishStatus("success"); setPublishMsg("Draft saved.");
   };
   const loadDraft = (key) => {
     const d = JSON.parse(localStorage.getItem(key));
     setMeta(d.meta);
-    setSchemaType(d.schemaType || "BlogPosting");
-    setSchemaOverrides(d.schemaOverrides || {});
-    setFaqs(Array.isArray(d.faqs) ? d.faqs : []);
+    setSchemas(normalizeSchemas(d.schemas));
     if (bodyRef.current) bodyRef.current.innerHTML = d.body || "";
     setCurrentDraftKey(key); setShowDrafts(false);
     setPublishStatus("success"); setPublishMsg("Draft loaded.");
   };
   const deleteDraft = (key) => { localStorage.removeItem(key); loadDrafts(); };
 
-  // ── FAQ schema helpers ──────────────────────────────────────────────────────
-  const addFaq    = () => setFaqs((p) => [...p, { q: "", a: "" }]);
-  const updateFaq = (i, field, val) => setFaqs((p) => p.map((f, k) => (k === i ? { ...f, [field]: val } : f)));
-  const removeFaq = (i) => setFaqs((p) => p.filter((_, k) => k !== i));
+  // ── Schema config helpers ─────────────────────────────────────────────────
+  const setSchemaCfg   = (id, patch) => setSchemas((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
+  const setSchemaField = (id, key, val) =>
+    setSchemas((p) => ({ ...p, [id]: { ...p[id], data: { ...p[id].data, [key]: val } } }));
+  const setSchemaItem  = (id, idx, key, val) =>
+    setSchemas((p) => {
+      const items = [...(p[id].data.items || [])];
+      items[idx] = { ...items[idx], [key]: val };
+      return { ...p, [id]: { ...p[id], data: { ...p[id].data, items } } };
+    });
+  const addSchemaItem = (id, def) =>
+    setSchemas((p) => ({ ...p, [id]: { ...p[id], data: { ...p[id].data, items: [...(p[id].data.items || []), def.newItem()] } } }));
+  const removeSchemaItem = (id, idx) =>
+    setSchemas((p) => ({ ...p, [id]: { ...p[id], data: { ...p[id].data, items: (p[id].data.items || []).filter((_, k) => k !== idx) } } }));
 
-  // Live JSON-LD preview built from the current form values
-  const jsonLdPreview = useMemo(
-    () => schemaToJsonLd({
-      slug: meta.slug || slugify(meta.title),
-      title: meta.title, headline: meta.title, description: meta.description,
-      heroImage: meta.heroImage, image: meta.heroImage, date: meta.date,
-      author: meta.author, schemaType, faqs, schemaOverrides,
-    }),
-    [meta.slug, meta.title, meta.description, meta.heroImage, meta.date, meta.author, schemaType, faqs, schemaOverrides],
-  );
+  // Combined JSON-LD preview of every enabled schema
+  const jsonLdPreview = useMemo(() => schemaGraphToString(schemas), [schemas]);
+  const enabledSchemaCount = useMemo(
+    () => Object.values(schemas).filter((s) => s.enabled).length, [schemas]);
 
   // ── Preview sections ──────────────────────────────────────────────────────
   const previewSections = useMemo(() => {
@@ -1055,98 +1048,123 @@ function BlogEditor({ editingBlog, onBack }) {
               {/* hidden file inputs */}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleContentImage(e.target.files[0])} />
 
-              {/* SCHEMA / STRUCTURED DATA BOX */}
+              {/* SCHEMAS CONTAINER */}
               <div className="meta-box mt-5">
                 <button className="meta-box-head w-full" onClick={() => setShowSchema((v) => !v)}>
-                  <span className="meta-box-title flex items-center gap-1.5"><Code2 size={13} /> Schema (structured data)</span>
+                  <span className="meta-box-title flex items-center gap-1.5">
+                    <Code2 size={13} /> Schemas{enabledSchemaCount ? ` (${enabledSchemaCount} active)` : ""}
+                  </span>
                   <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSchema ? "rotate-180" : ""}`} />
                 </button>
                 {showSchema && (
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-                      <Field label="Article schema type">
-                        <select value={schemaType} onChange={(e) => setSchemaType(e.target.value)} className="wp-input">
-                          <option value="BlogPosting">BlogPosting (default)</option>
-                          <option value="Article">Article</option>
-                          <option value="NewsArticle">NewsArticle</option>
-                        </select>
-                      </Field>
-                      <p className="text-[12px] text-[#646970] leading-relaxed sm:pt-5">
-                        Article fields are pre-filled from the post. Override individual fields below if needed.
-                      </p>
-                    </div>
+                  <div className="p-4 space-y-3">
+                    <p className="text-[12px] text-[#646970] leading-relaxed">
+                      Turn on the schemas this post needs. Use <strong>Default</strong> to fill the fixed
+                      fields, or <strong>Upload</strong> to paste your own JSON-LD. Each enabled schema is
+                      added to the published page.
+                    </p>
 
-                    {/* ── Editable schema key-value fields ── */}
-                    <div>
-                      <span className="text-[12px] font-semibold text-[#50575e] block mb-2">Schema field overrides</span>
-                      <div className="border border-[#dcdcde] rounded overflow-hidden">
-                        {/* Table header */}
-                        <div className="grid grid-cols-[160px_1fr] bg-[#f6f7f7] border-b border-[#dcdcde]">
-                          <span className="px-3 py-2 text-[11px] font-bold text-[#50575e] uppercase tracking-wider border-r border-[#dcdcde]">Field (key)</span>
-                          <span className="px-3 py-2 text-[11px] font-bold text-[#50575e] uppercase tracking-wider">Value</span>
-                        </div>
-                        {/* Auto-filled row helper */}
-                        {[
-                          { key: "headline",       label: "Headline",        placeholder: meta.title || "auto-filled from title",      hint: "Overrides schema headline" },
-                          { key: "description",    label: "Description",     placeholder: meta.description || "auto-filled from meta",  hint: "Overrides schema description" },
-                          { key: "datePublished",  label: "Date Published",  placeholder: meta.date || "auto-filled from publish date", hint: "e.g. 2026-06-12" },
-                          { key: "authorName",     label: "Author name",     placeholder: meta.author || "Novara Nature Estates",       hint: "Overrides author.name" },
-                          { key: "publisherName",  label: "Publisher name",  placeholder: "Novara Nature Estates",                      hint: "Overrides publisher.name" },
-                          { key: "publisherLogo",  label: "Publisher logo URL", placeholder: "https://…",                              hint: "Overrides publisher logo" },
-                        ].map(({ key, label, placeholder, hint }) => (
-                          <div key={key} className="grid grid-cols-[160px_1fr] border-b border-[#dcdcde] last:border-b-0 hover:bg-[#fafafa] transition-colors">
-                            <div className="px-3 py-2 border-r border-[#dcdcde] flex flex-col justify-center">
-                              <span className="text-[12px] font-semibold text-[#1d2327]">{label}</span>
-                              <span className="text-[10px] text-[#787c82] mt-0.5">{hint}</span>
-                            </div>
-                            <div className="px-2 py-1.5 flex items-center gap-2">
-                              <input
-                                value={schemaOverrides[key] || ""}
-                                onChange={(e) => setSchemaOverrides((p) => ({ ...p, [key]: e.target.value }))}
-                                placeholder={placeholder}
-                                className="flex-1 px-2 py-1.5 text-[12px] text-[#1d2327] border border-[#c3c4c7] rounded-[3px] bg-white focus:outline-none focus:border-[#2271b1] placeholder:text-[#a7aaad]"
-                              />
-                              {schemaOverrides[key] && (
-                                <button
-                                  type="button"
-                                  onClick={() => setSchemaOverrides((p) => { const n = { ...p }; delete n[key]; return n; })}
-                                  title="Clear override"
-                                  className="text-[11px] text-[#b32d2e] hover:underline shrink-0"
-                                >Clear</button>
+                    {SCHEMA_DEFS.map((def) => {
+                      const cfg = schemas[def.id];
+                      if (!cfg) return null;
+                      return (
+                        <div key={def.id} className="border border-[#dcdcde] rounded">
+                          {/* Section header: enable + mode */}
+                          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#f6f7f7] border-b border-[#dcdcde]">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={cfg.enabled}
+                                onChange={(e) => setSchemaCfg(def.id, { enabled: e.target.checked })} />
+                              <span className="text-[13px] font-bold text-[#1d2327]">{def.label}</span>
+                            </label>
+                            {cfg.enabled && (
+                              <div className="flex rounded overflow-hidden border border-[#c3c4c7] text-[11px] font-semibold shrink-0">
+                                {[["default", "Default"], ["upload", "Upload"]].map(([m, lbl]) => (
+                                  <button key={m} type="button" onClick={() => setSchemaCfg(def.id, { mode: m })}
+                                    className={`px-2.5 py-1 ${cfg.mode === m ? "bg-[#2271b1] text-white" : "bg-white text-[#2271b1]"}`}>
+                                    {lbl}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {cfg.enabled && (
+                            <div className="p-3">
+                              {/* ── Upload mode ── */}
+                              {cfg.mode === "upload" ? (
+                                <>
+                                  <textarea
+                                    rows={6}
+                                    value={cfg.json}
+                                    onChange={(e) => setSchemaCfg(def.id, { json: e.target.value })}
+                                    placeholder={`Paste your ${def.label} JSON or full <script type="application/ld+json"> block…`}
+                                    className="wp-input resize-y"
+                                    style={{ fontFamily: "ui-monospace, monospace", fontSize: "11px" }}
+                                  />
+                                  {cfg.json.trim() && (
+                                    parseJsonLd(cfg.json)
+                                      ? <span className="text-[11px] text-[#1B9A63] mt-1 block">✓ Valid JSON-LD</span>
+                                      : <span className="text-[11px] text-[#b32d2e] mt-1 block">⚠ Invalid JSON — check the syntax.</span>
+                                  )}
+                                </>
+                              ) : def.kind === "object" ? (
+                                /* ── Default mode: fixed key→value fields ── */
+                                <div className="grid grid-cols-[140px_1fr] gap-x-2 gap-y-2 items-start">
+                                  {def.fields.map((f) => (
+                                    <React.Fragment key={f.key}>
+                                      <span className="text-[11px] font-semibold text-[#50575e] pt-2">{f.label}</span>
+                                      {f.type === "textarea" ? (
+                                        <textarea rows={2} value={cfg.data[f.key] || ""} placeholder={f.placeholder}
+                                          onChange={(e) => setSchemaField(def.id, f.key, e.target.value)}
+                                          className="wp-input resize-y" />
+                                      ) : (
+                                        <input value={cfg.data[f.key] || ""} placeholder={f.placeholder}
+                                          onChange={(e) => setSchemaField(def.id, f.key, e.target.value)}
+                                          className="wp-input" />
+                                      )}
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ) : (
+                                /* ── Default mode: repeatable items (FAQ / breadcrumb) ── */
+                                <div className="space-y-2">
+                                  {(cfg.data.items || []).map((it, idx) => (
+                                    <div key={idx} className="border border-[#dcdcde] rounded p-2 space-y-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-semibold text-[#787c82]">#{idx + 1}</span>
+                                        <button onClick={() => removeSchemaItem(def.id, idx)}
+                                          className="text-[11px] text-[#b32d2e] hover:underline">Remove</button>
+                                      </div>
+                                      {def.itemFields.map((f) => (
+                                        f.type === "textarea" ? (
+                                          <textarea key={f.key} rows={2} value={it[f.key] || ""} placeholder={f.label}
+                                            onChange={(e) => setSchemaItem(def.id, idx, f.key, e.target.value)}
+                                            className="wp-input resize-y" />
+                                        ) : (
+                                          <input key={f.key} value={it[f.key] || ""} placeholder={f.label}
+                                            onChange={(e) => setSchemaItem(def.id, idx, f.key, e.target.value)}
+                                            className="wp-input" />
+                                        )
+                                      ))}
+                                    </div>
+                                  ))}
+                                  <button onClick={() => addSchemaItem(def.id, def)} className="wp-secondary flex items-center gap-1">
+                                    <Plus size={12} /> {def.addLabel}
+                                  </button>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-[#787c82] mt-1.5">Leave a field blank to use the auto-filled value from the post.</p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[12px] font-semibold text-[#50575e]">FAQ schema</span>
-                        <button onClick={addFaq} className="wp-secondary flex items-center gap-1"><Plus size={12} /> Add Q&amp;A</button>
-                      </div>
-                      {faqs.length === 0 && <p className="text-[12px] text-[#646970]">No FAQs added.</p>}
-                      <div className="space-y-2">
-                        {faqs.map((f, i) => (
-                          <div key={i} className="border border-[#dcdcde] rounded p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-semibold text-[#787c82]">Q{i + 1}</span>
-                              <button onClick={() => removeFaq(i)} className="text-[12px] text-[#b32d2e] hover:underline">Remove</button>
-                            </div>
-                            <input value={f.q} onChange={(e) => updateFaq(i, "q", e.target.value)} placeholder="Question" className="wp-input" />
-                            <textarea rows={2} value={f.a} onChange={(e) => updateFaq(i, "a", e.target.value)} placeholder="Answer" className="wp-input resize-none" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     <div>
                       <button onClick={() => setShowJsonLd((v) => !v)} className="wp-link flex items-center gap-1">
                         {showJsonLd ? "Hide" : "View"} generated JSON-LD
                       </button>
                       {showJsonLd && (
-                        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[11px] leading-relaxed p-3 row-scroll whitespace-pre-wrap">{jsonLdPreview}</pre>
+                        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[11px] leading-relaxed p-3 row-scroll whitespace-pre-wrap">{jsonLdPreview || "// Enable a schema to see its JSON-LD"}</pre>
                       )}
                     </div>
                   </div>
