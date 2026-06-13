@@ -26,6 +26,20 @@ const slugify = (str = "") =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 
+// Extracts YouTube video ID from any standard YouTube URL format
+const getYouTubeId = (url = "") => {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([^&\n?#]+)/,
+    /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m && m[1]) return m[1];
+  }
+  return null;
+};
+
 const escapeHtml = (s = "") =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -466,6 +480,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const [showJsonLd, setShowJsonLd] = useState(false);
   const [schemaType, setSchemaType] = useState("BlogPosting");
   const [faqs, setFaqs] = useState([]); // [{ q, a }]
+  const [videoPopupOpen, setVideoPopupOpen] = useState(false);
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishMsg, setPublishMsg] = useState("");
@@ -477,7 +492,7 @@ function BlogEditor({ editingBlog, onBack }) {
     title: "", description: "", keywords: "", slug: "",
     category: "Managed Farmland", author: "Novara Nature Estates",
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    heroImage: "", imageAlt: "", imageTitle: "", imageCaption: "", imageDescription: "", tags: "",
+    heroImage: "", imageAlt: "", imageTitle: "", imageCaption: "", imageDescription: "", videoUrl: "", tags: "",
   });
 
   // Editable schema key-value overrides
@@ -511,6 +526,7 @@ function BlogEditor({ editingBlog, onBack }) {
       imageTitle:       editingBlog.imageTitle     || "",
       imageCaption:     editingBlog.imageCaption   || "",
       imageDescription: editingBlog.imageDescription || "",
+      videoUrl:         editingBlog.videoUrl         || "",
       tags:             (editingBlog.tags || []).join(", "),
     });
     setSchemaType(editingBlog.schemaType || "BlogPosting");
@@ -727,6 +743,7 @@ function BlogEditor({ editingBlog, onBack }) {
       imageTitle: meta.imageTitle,
       imageCaption: meta.imageCaption,
       imageDescription: meta.imageDescription,
+      videoUrl: meta.videoUrl,
       tags: tagsArr, sections,
       schemaType,
       schemaOverrides,
@@ -1194,16 +1211,33 @@ function BlogEditor({ editingBlog, onBack }) {
               <div className="meta-box">
                 <div className="meta-box-head"><span className="meta-box-title">Featured image</span></div>
                 <div className="p-3">
+                  {/* Thumbnail preview — shows play overlay when a video URL is set */}
                   {meta.heroImage ? (
-                    <div className="relative">
+                    <div className="relative group">
                       <img src={meta.heroImage} alt="featured" className="w-full h-28 object-cover rounded border border-slate-100" />
-                      <button onClick={() => setMeta((p) => ({ ...p, heroImage: "" }))} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600">×</button>
+                      {/* Play overlay — only shown when videoUrl is filled */}
+                      {meta.videoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setVideoPopupOpen(true)}
+                          className="absolute inset-0 flex items-center justify-center rounded bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Preview video"
+                        >
+                          <span className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                            <svg viewBox="0 0 24 24" fill="#E3A600" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>
+                          </span>
+                          <span className="absolute bottom-1.5 left-2 text-[10px] text-white font-semibold drop-shadow">Video thumbnail</span>
+                        </button>
+                      )}
+                      <button onClick={() => setMeta((p) => ({ ...p, heroImage: "" }))} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 z-10">×</button>
                     </div>
                   ) : null}
+
                   <div className={meta.heroImage ? "mt-2" : ""}>
                     <input ref={heroInputRef} type="file" accept="image/*" disabled={heroUploading} onChange={(e) => handleHeroImage(e.target.files[0])} />
                     {heroUploading && <div className="mt-2 flex items-center gap-2 text-xs text-[#1A614F] font-semibold"><Loader size={12} className="animate-spin" /> Uploading…</div>}
                   </div>
+
                   <div className="mt-2 space-y-2">
                     <label className="block">
                       <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Alt text <span className="text-[#787c82] font-normal">(SEO)</span></span>
@@ -1225,9 +1259,78 @@ function BlogEditor({ editingBlog, onBack }) {
                       <textarea rows={2} value={meta.imageDescription} onChange={(e) => setMeta((p) => ({ ...p, imageDescription: e.target.value }))} placeholder="Longer description of the image"
                         className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1] resize-none" />
                     </label>
+
+                    {/* ── Video / YouTube link ── */}
+                    <div className="pt-1 border-t border-[#f0f0f1]">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e] flex items-center gap-1.5">
+                        <svg viewBox="0 0 24 24" fill="#FF0000" width="13" height="13"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.2 31.2 0 0 0 0 12a31.2 31.2 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.2 31.2 0 0 0 24 12a31.2 31.2 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+                        YouTube video URL
+                      </span>
+                      <input
+                        value={meta.videoUrl}
+                        onChange={(e) => setMeta((p) => ({ ...p, videoUrl: e.target.value }))}
+                        placeholder="https://youtube.com/watch?v=… or youtu.be/…"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]"
+                      />
+                      {meta.videoUrl && (() => {
+                        const vid = getYouTubeId(meta.videoUrl);
+                        return vid ? (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="text-[10px] text-[#1B9A63] font-semibold flex items-center gap-1">
+                              <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M9 16.2l-4.2-4.2L3.4 13.4 9 19 21 7l-1.4-1.4z"/></svg>
+                              Valid YouTube ID: {vid}
+                            </span>
+                            <button type="button" onClick={() => setVideoPopupOpen(true)}
+                              className="text-[10px] text-[#2271b1] underline">Preview</button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-[#b32d2e] mt-1 block">⚠ Couldn't detect a YouTube video ID — check the URL.</span>
+                        );
+                      })()}
+                      <p className="text-[10px] text-[#787c82] mt-1">When set, the featured image acts as a video thumbnail. Readers can click it to watch the video in a lightbox.</p>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* ── YouTube video lightbox popup ── */}
+              {videoPopupOpen && (() => {
+                const vid = getYouTubeId(meta.videoUrl);
+                return (
+                  <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.82)" }}
+                    onClick={() => setVideoPopupOpen(false)}
+                  >
+                    <div
+                      className="relative w-full max-w-3xl mx-4"
+                      style={{ aspectRatio: "16/9" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => setVideoPopupOpen(false)}
+                        className="absolute -top-9 right-0 text-white text-sm font-semibold flex items-center gap-1.5 hover:text-[#E3A600] transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        Close
+                      </button>
+                      {vid ? (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${vid}?autoplay=1&rel=0`}
+                          allow="autoplay; fullscreen"
+                          allowFullScreen
+                          className="w-full h-full rounded-xl border-0"
+                          title="YouTube video preview"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-xl bg-[#1d2327] flex items-center justify-center text-white text-sm">
+                          Invalid YouTube URL — cannot preview.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* POST SETTINGS / SEO BOX */}
               <div className="meta-box">
