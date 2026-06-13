@@ -5,10 +5,11 @@ import {
   Palette, ChevronDown, Eye, EyeOff, Home, FileText, Image as MediaIcon,
   Leaf, LogIn, LogOut, Loader, AlertCircle, CheckCircle, Send, Search,
   Edit3, ArrowLeft, Plus, Upload, Settings, Calendar, Globe,
-  CircleDot, ChevronsUpDown,
+  CircleDot, ChevronsUpDown, Code2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BLOGS } from "../data/blogs";
+import { schemaToJsonLd } from "../utils/schema";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API_BASE =
@@ -461,6 +462,10 @@ function BlogEditor({ editingBlog, onBack }) {
   const [showSettings, setShowSettings] = useState(true);
   const [showDrafts, setShowDrafts] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
+  const [showSchema, setShowSchema] = useState(true);
+  const [showJsonLd, setShowJsonLd] = useState(false);
+  const [schemaType, setSchemaType] = useState("BlogPosting");
+  const [faqs, setFaqs] = useState([]); // [{ q, a }]
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishMsg, setPublishMsg] = useState("");
@@ -502,6 +507,8 @@ function BlogEditor({ editingBlog, onBack }) {
       imageAlt:    editingBlog.imageAlt     || editingBlog.title || "",
       tags:        (editingBlog.tags || []).join(", "),
     });
+    setSchemaType(editingBlog.schemaType || "BlogPosting");
+    setFaqs(Array.isArray(editingBlog.faqs) ? editingBlog.faqs : []);
     const html = sectionsToHtml(editingBlog.sections || []);
     if (bodyRef.current) bodyRef.current.innerHTML = html;
   }, [editingBlog]);
@@ -710,6 +717,9 @@ function BlogEditor({ editingBlog, onBack }) {
       keywords: meta.keywords, author: meta.author,
       image: meta.heroImage, heroImage: meta.heroImage, coverImage: meta.heroImage,
       imageAlt: meta.imageAlt || title, tags: tagsArr, sections,
+      schemaType,
+      faqs: faqs.map((f) => ({ q: (f.q || "").trim(), a: (f.a || "").trim() }))
+                .filter((f) => f.q && f.a),
     };
   };
 
@@ -809,18 +819,36 @@ function BlogEditor({ editingBlog, onBack }) {
   const saveDraft = () => {
     const key = currentDraftKey || `draft_${Date.now()}`;
     const body = bodyRef.current ? bodyRef.current.innerHTML : "";
-    localStorage.setItem(key, JSON.stringify({ meta, body, savedAt: new Date().toISOString() }));
+    localStorage.setItem(key, JSON.stringify({ meta, body, schemaType, faqs, savedAt: new Date().toISOString() }));
     setCurrentDraftKey(key); loadDrafts();
     setPublishStatus("success"); setPublishMsg("Draft saved.");
   };
   const loadDraft = (key) => {
     const d = JSON.parse(localStorage.getItem(key));
     setMeta(d.meta);
+    setSchemaType(d.schemaType || "BlogPosting");
+    setFaqs(Array.isArray(d.faqs) ? d.faqs : []);
     if (bodyRef.current) bodyRef.current.innerHTML = d.body || "";
     setCurrentDraftKey(key); setShowDrafts(false);
     setPublishStatus("success"); setPublishMsg("Draft loaded.");
   };
   const deleteDraft = (key) => { localStorage.removeItem(key); loadDrafts(); };
+
+  // ── FAQ schema helpers ──────────────────────────────────────────────────────
+  const addFaq    = () => setFaqs((p) => [...p, { q: "", a: "" }]);
+  const updateFaq = (i, field, val) => setFaqs((p) => p.map((f, k) => (k === i ? { ...f, [field]: val } : f)));
+  const removeFaq = (i) => setFaqs((p) => p.filter((_, k) => k !== i));
+
+  // Live JSON-LD preview built from the current form values
+  const jsonLdPreview = useMemo(
+    () => schemaToJsonLd({
+      slug: meta.slug || slugify(meta.title),
+      title: meta.title, headline: meta.title, description: meta.description,
+      heroImage: meta.heroImage, image: meta.heroImage, date: meta.date,
+      author: meta.author, schemaType, faqs,
+    }),
+    [meta.slug, meta.title, meta.description, meta.heroImage, meta.date, meta.author, schemaType, faqs],
+  );
 
   // ── Preview sections ──────────────────────────────────────────────────────
   const previewSections = useMemo(() => {
@@ -1083,6 +1111,58 @@ function BlogEditor({ editingBlog, onBack }) {
                       <Field label="Author"><input value={meta.author} onChange={(e) => setMeta((p) => ({ ...p, author: e.target.value }))} className="wp-input" /></Field>
                     </div>
                     <Field label="Tags (comma-separated)"><input value={meta.tags} onChange={(e) => setMeta((p) => ({ ...p, tags: e.target.value }))} placeholder="Organic, Eco" className="wp-input" /></Field>
+                  </div>
+                )}
+              </div>
+
+              {/* SCHEMA / STRUCTURED DATA BOX */}
+              <div className="meta-box">
+                <button className="meta-box-head w-full" onClick={() => setShowSchema((v) => !v)}>
+                  <span className="meta-box-title flex items-center gap-1.5"><Code2 size={13} /> Schema (structured data)</span>
+                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSchema ? "rotate-180" : ""}`} />
+                </button>
+                {showSchema && (
+                  <div className="p-3 space-y-3">
+                    <Field label="Article schema type">
+                      <select value={schemaType} onChange={(e) => setSchemaType(e.target.value)} className="wp-input">
+                        <option value="BlogPosting">BlogPosting (default)</option>
+                        <option value="Article">Article</option>
+                        <option value="NewsArticle">NewsArticle</option>
+                      </select>
+                    </Field>
+                    <p className="text-[11px] text-[#646970] leading-relaxed">
+                      Article fields (headline, description, image, date, author) are filled
+                      automatically from the post. Add FAQs below for rich FAQ results.
+                    </p>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-semibold text-[#50575e]">FAQ schema</span>
+                        <button onClick={addFaq} className="wp-link flex items-center gap-1"><Plus size={12} /> Add Q&amp;A</button>
+                      </div>
+                      {faqs.length === 0 && <p className="text-[11px] text-[#646970]">No FAQs added.</p>}
+                      <div className="space-y-2">
+                        {faqs.map((f, i) => (
+                          <div key={i} className="border border-[#dcdcde] rounded p-2 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-[#787c82]">Q{i + 1}</span>
+                              <button onClick={() => removeFaq(i)} className="text-[11px] text-[#b32d2e] hover:underline">Remove</button>
+                            </div>
+                            <input value={f.q} onChange={(e) => updateFaq(i, "q", e.target.value)} placeholder="Question" className="wp-input" />
+                            <textarea rows={2} value={f.a} onChange={(e) => updateFaq(i, "a", e.target.value)} placeholder="Answer" className="wp-input resize-none" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <button onClick={() => setShowJsonLd((v) => !v)} className="wp-link flex items-center gap-1">
+                        {showJsonLd ? "Hide" : "View"} generated JSON-LD
+                      </button>
+                      {showJsonLd && (
+                        <pre className="mt-2 max-h-60 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[10px] leading-relaxed p-2 row-scroll whitespace-pre-wrap">{jsonLdPreview}</pre>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
