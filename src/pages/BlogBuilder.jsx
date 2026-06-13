@@ -477,8 +477,11 @@ function BlogEditor({ editingBlog, onBack }) {
     title: "", description: "", keywords: "", slug: "",
     category: "Managed Farmland", author: "Novara Nature Estates",
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    heroImage: "", imageAlt: "", tags: "",
+    heroImage: "", imageAlt: "", imageTitle: "", imageCaption: "", imageDescription: "", tags: "",
   });
+
+  // Editable schema key-value overrides
+  const [schemaOverrides, setSchemaOverrides] = useState({});
 
   const editingBlogId = useRef(editingBlog?.id ?? null);
   const editingBlogOriginalSlug = useRef(editingBlog?.slug ?? "");
@@ -496,18 +499,22 @@ function BlogEditor({ editingBlog, onBack }) {
     editingBlogId.current = editingBlog.id;
     editingBlogOriginalSlug.current = editingBlog.slug || "";
     setMeta({
-      title:       editingBlog.headline    || editingBlog.title || "",
-      description: editingBlog.description  || "",
-      keywords:    editingBlog.keywords     || "",
-      slug:        editingBlog.slug         || "",
-      category:    editingBlog.category     || "Managed Farmland",
-      author:      editingBlog.author       || "Novara Nature Estates",
-      date:        editingBlog.date         || "",
-      heroImage:   editingBlog.heroImage    || editingBlog.image || "",
-      imageAlt:    editingBlog.imageAlt     || editingBlog.title || "",
-      tags:        (editingBlog.tags || []).join(", "),
+      title:            editingBlog.headline       || editingBlog.title || "",
+      description:      editingBlog.description    || "",
+      keywords:         editingBlog.keywords       || "",
+      slug:             editingBlog.slug           || "",
+      category:         editingBlog.category       || "Managed Farmland",
+      author:           editingBlog.author         || "Novara Nature Estates",
+      date:             editingBlog.date           || "",
+      heroImage:        editingBlog.heroImage      || editingBlog.image || "",
+      imageAlt:         editingBlog.imageAlt       || editingBlog.title || "",
+      imageTitle:       editingBlog.imageTitle     || "",
+      imageCaption:     editingBlog.imageCaption   || "",
+      imageDescription: editingBlog.imageDescription || "",
+      tags:             (editingBlog.tags || []).join(", "),
     });
     setSchemaType(editingBlog.schemaType || "BlogPosting");
+    setSchemaOverrides(editingBlog.schemaOverrides || {});
     setFaqs(Array.isArray(editingBlog.faqs) ? editingBlog.faqs : []);
     const html = sectionsToHtml(editingBlog.sections || []);
     if (bodyRef.current) bodyRef.current.innerHTML = html;
@@ -716,8 +723,13 @@ function BlogEditor({ editingBlog, onBack }) {
       description: meta.description, date: meta.date,
       keywords: meta.keywords, author: meta.author,
       image: meta.heroImage, heroImage: meta.heroImage, coverImage: meta.heroImage,
-      imageAlt: meta.imageAlt || title, tags: tagsArr, sections,
+      imageAlt: meta.imageAlt || title,
+      imageTitle: meta.imageTitle,
+      imageCaption: meta.imageCaption,
+      imageDescription: meta.imageDescription,
+      tags: tagsArr, sections,
       schemaType,
+      schemaOverrides,
       faqs: faqs.map((f) => ({ q: (f.q || "").trim(), a: (f.a || "").trim() }))
                 .filter((f) => f.q && f.a),
     };
@@ -819,7 +831,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const saveDraft = () => {
     const key = currentDraftKey || `draft_${Date.now()}`;
     const body = bodyRef.current ? bodyRef.current.innerHTML : "";
-    localStorage.setItem(key, JSON.stringify({ meta, body, schemaType, faqs, savedAt: new Date().toISOString() }));
+    localStorage.setItem(key, JSON.stringify({ meta, body, schemaType, schemaOverrides, faqs, savedAt: new Date().toISOString() }));
     setCurrentDraftKey(key); loadDrafts();
     setPublishStatus("success"); setPublishMsg("Draft saved.");
   };
@@ -827,6 +839,7 @@ function BlogEditor({ editingBlog, onBack }) {
     const d = JSON.parse(localStorage.getItem(key));
     setMeta(d.meta);
     setSchemaType(d.schemaType || "BlogPosting");
+    setSchemaOverrides(d.schemaOverrides || {});
     setFaqs(Array.isArray(d.faqs) ? d.faqs : []);
     if (bodyRef.current) bodyRef.current.innerHTML = d.body || "";
     setCurrentDraftKey(key); setShowDrafts(false);
@@ -843,11 +856,14 @@ function BlogEditor({ editingBlog, onBack }) {
   const jsonLdPreview = useMemo(
     () => schemaToJsonLd({
       slug: meta.slug || slugify(meta.title),
-      title: meta.title, headline: meta.title, description: meta.description,
+      title: schemaOverrides.headline || meta.title,
+      headline: schemaOverrides.headline || meta.title,
+      description: schemaOverrides.description || meta.description,
       heroImage: meta.heroImage, image: meta.heroImage, date: meta.date,
-      author: meta.author, schemaType, faqs,
+      author: schemaOverrides.authorName || meta.author,
+      schemaType, faqs,
     }),
-    [meta.slug, meta.title, meta.description, meta.heroImage, meta.date, meta.author, schemaType, faqs],
+    [meta.slug, meta.title, meta.description, meta.heroImage, meta.date, meta.author, schemaType, faqs, schemaOverrides],
   );
 
   // ── Preview sections ──────────────────────────────────────────────────────
@@ -1042,9 +1058,53 @@ function BlogEditor({ editingBlog, onBack }) {
                         </select>
                       </Field>
                       <p className="text-[12px] text-[#646970] leading-relaxed sm:pt-5">
-                        Article fields (headline, description, image, date, author) are filled
-                        automatically from the post. Add FAQs for rich FAQ results.
+                        Article fields are pre-filled from the post. Override individual fields below if needed.
                       </p>
+                    </div>
+
+                    {/* ── Editable schema key-value fields ── */}
+                    <div>
+                      <span className="text-[12px] font-semibold text-[#50575e] block mb-2">Schema field overrides</span>
+                      <div className="border border-[#dcdcde] rounded overflow-hidden">
+                        {/* Table header */}
+                        <div className="grid grid-cols-[160px_1fr] bg-[#f6f7f7] border-b border-[#dcdcde]">
+                          <span className="px-3 py-2 text-[11px] font-bold text-[#50575e] uppercase tracking-wider border-r border-[#dcdcde]">Field (key)</span>
+                          <span className="px-3 py-2 text-[11px] font-bold text-[#50575e] uppercase tracking-wider">Value</span>
+                        </div>
+                        {/* Auto-filled row helper */}
+                        {[
+                          { key: "headline",       label: "Headline",        placeholder: meta.title || "auto-filled from title",      hint: "Overrides schema headline" },
+                          { key: "description",    label: "Description",     placeholder: meta.description || "auto-filled from meta",  hint: "Overrides schema description" },
+                          { key: "datePublished",  label: "Date Published",  placeholder: meta.date || "auto-filled from publish date", hint: "e.g. 2026-06-12" },
+                          { key: "authorName",     label: "Author name",     placeholder: meta.author || "Novara Nature Estates",       hint: "Overrides author.name" },
+                          { key: "publisherName",  label: "Publisher name",  placeholder: "Novara Nature Estates",                      hint: "Overrides publisher.name" },
+                          { key: "publisherLogo",  label: "Publisher logo URL", placeholder: "https://…",                              hint: "Overrides publisher logo" },
+                        ].map(({ key, label, placeholder, hint }) => (
+                          <div key={key} className="grid grid-cols-[160px_1fr] border-b border-[#dcdcde] last:border-b-0 hover:bg-[#fafafa] transition-colors">
+                            <div className="px-3 py-2 border-r border-[#dcdcde] flex flex-col justify-center">
+                              <span className="text-[12px] font-semibold text-[#1d2327]">{label}</span>
+                              <span className="text-[10px] text-[#787c82] mt-0.5">{hint}</span>
+                            </div>
+                            <div className="px-2 py-1.5 flex items-center gap-2">
+                              <input
+                                value={schemaOverrides[key] || ""}
+                                onChange={(e) => setSchemaOverrides((p) => ({ ...p, [key]: e.target.value }))}
+                                placeholder={placeholder}
+                                className="flex-1 px-2 py-1.5 text-[12px] text-[#1d2327] border border-[#c3c4c7] rounded-[3px] bg-white focus:outline-none focus:border-[#2271b1] placeholder:text-[#a7aaad]"
+                              />
+                              {schemaOverrides[key] && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSchemaOverrides((p) => { const n = { ...p }; delete n[key]; return n; })}
+                                  title="Clear override"
+                                  className="text-[11px] text-[#b32d2e] hover:underline shrink-0"
+                                >Clear</button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-[#787c82] mt-1.5">Leave a field blank to use the auto-filled value from the post.</p>
                     </div>
 
                     <div>
@@ -1144,8 +1204,28 @@ function BlogEditor({ editingBlog, onBack }) {
                     <input ref={heroInputRef} type="file" accept="image/*" disabled={heroUploading} onChange={(e) => handleHeroImage(e.target.files[0])} />
                     {heroUploading && <div className="mt-2 flex items-center gap-2 text-xs text-[#1A614F] font-semibold"><Loader size={12} className="animate-spin" /> Uploading…</div>}
                   </div>
-                  <input value={meta.imageAlt} onChange={(e) => setMeta((p) => ({ ...p, imageAlt: e.target.value }))} placeholder="Alt text for SEO"
-                    className="mt-2 w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                  <div className="mt-2 space-y-2">
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Alt text <span className="text-[#787c82] font-normal">(SEO)</span></span>
+                      <input value={meta.imageAlt} onChange={(e) => setMeta((p) => ({ ...p, imageAlt: e.target.value }))} placeholder="Describe the image for search engines"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                    </label>
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Title</span>
+                      <input value={meta.imageTitle} onChange={(e) => setMeta((p) => ({ ...p, imageTitle: e.target.value }))} placeholder="Image title attribute"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                    </label>
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Caption</span>
+                      <input value={meta.imageCaption} onChange={(e) => setMeta((p) => ({ ...p, imageCaption: e.target.value }))} placeholder="Shown below the image"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                    </label>
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Description</span>
+                      <textarea rows={2} value={meta.imageDescription} onChange={(e) => setMeta((p) => ({ ...p, imageDescription: e.target.value }))} placeholder="Longer description of the image"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1] resize-none" />
+                    </label>
+                  </div>
                 </div>
               </div>
 
