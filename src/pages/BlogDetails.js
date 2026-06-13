@@ -12,7 +12,7 @@ import { navigate } from "vike/client/router";
 import { BLOGS } from "../data/blogs";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import InquiryForm from "../components/InquiryForm";
 import { motion } from "framer-motion";
 import { usePageContext } from "vike-react/usePageContext";
@@ -320,6 +320,25 @@ export default function BlogDetail({ vikeSlug }) {
                       <h3 key={i} id={id} className="scroll-mt-28 text-[16px] sm:text-[18px] font-bold text-[#111827]">
                         {s.text}
                       </h3>
+                    );
+                  }
+
+                  // H1 / H4 / H5 / H6
+                  if (["h1", "h4", "h5", "h6"].includes(s.type)) {
+                    const size = {
+                      h1: "text-[24px] sm:text-[30px]",
+                      h4: "text-[15px] sm:text-[16px]",
+                      h5: "text-[13px] sm:text-[14px]",
+                      h6: "text-[12px] sm:text-[13px]",
+                    }[s.type];
+                    const base = slugify(s.text || "");
+                    const count = (used.get(base) || 0) + 1;
+                    used.set(base, count);
+                    const id = count === 1 ? base : `${base}-${count}`;
+                    return createElement(
+                      s.type,
+                      { key: i, id, className: `scroll-mt-28 ${size} font-bold text-[#111827] mt-4` },
+                      s.text,
                     );
                   }
 

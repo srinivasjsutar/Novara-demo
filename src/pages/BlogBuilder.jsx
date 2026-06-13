@@ -175,12 +175,12 @@ const htmlToSections = (html = "") => {
 
 // ─── Preview renderer (mirrors BlogDetails) ───────────────────────────────────
 function PreviewSection({ s, usedH3 }) {
-  if (["h2","h3","h4","h5","h6"].includes(s.type)) {
+  if (["h1","h2","h3","h4","h5","h6"].includes(s.type)) {
     const base = slugify(s.text || "");
     const count = (usedH3.get(base) || 0) + 1; usedH3.set(base, count);
     const id = count === 1 ? base : `${base}-${count}`;
     const size = {
-      h2: "text-[20px] sm:text-[24px]", h3: "text-[16px] sm:text-[18px]",
+      h1: "text-[24px] sm:text-[30px]", h2: "text-[20px] sm:text-[24px]", h3: "text-[16px] sm:text-[18px]",
       h4: "text-[15px] sm:text-[16px]", h5: "text-[13px] sm:text-[14px]", h6: "text-[12px] sm:text-[13px]",
     }[s.type];
     return React.createElement(s.type, { id, className: `scroll-mt-28 ${size} font-bold text-[#111827]` }, s.text);
