@@ -1335,9 +1335,18 @@ function BlogEditor({ editingBlog, onBack }) {
                       )}
                       <button onClick={() => setMeta((p) => ({ ...p, heroImage: "" }))} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 z-10">×</button>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="w-full h-28 rounded border border-dashed border-[#c3c4c7] bg-[#f6f7f7] flex flex-col items-center justify-center text-[#a7aaad] gap-1 select-none">
+                      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <path d="M21 15l-5-5L5 21" />
+                      </svg>
+                      <span className="text-[11px]">No featured image yet</span>
+                    </div>
+                  )}
 
-                  <div className={meta.heroImage ? "mt-2" : ""}>
+                  <div className="mt-2">
                     <input ref={heroInputRef} type="file" accept="image/*" disabled={heroUploading} onChange={(e) => handleHeroImage(e.target.files[0])} />
                     {heroUploading && <div className="mt-2 flex items-center gap-2 text-xs text-[#1A614F] font-semibold"><Loader size={12} className="animate-spin" /> Uploading…</div>}
                   </div>
