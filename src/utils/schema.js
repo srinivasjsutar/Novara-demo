@@ -1,48 +1,41 @@
 // src/utils/schema.js
-// Fixed Schema.org templates for the Blog Builder.
-// Each schema has a FIXED key structure. In the builder the blogger can either
-//   • "default" → edit the values of those fixed keys (no new keys), or
-//   • "upload"  → paste their own raw JSON / <script type="application/ld+json"> block.
-// Shared by the builder (UI + preview) and the live page (+Head) so the preview
-// always matches what ships.
+// Schema.org templates for the Blog Builder.
+// Each schema can be edited two ways:
+//   • "default" → edit the schema's key→value pairs in input boxes
+//   • "upload"  → paste raw JSON / a <script type="application/ld+json"> block,
+//                 then Save to load those values into the Default fields.
+// Object schemas keep the FULL pasted object as their editable data, so nothing
+// is lost (e.g. an added "name"); list schemas (FAQ/Breadcrumb) use repeatable
+// item rows. Shared by the builder (UI + preview) and the live page (+Head).
 
-// Strip a <script type="application/ld+json"> wrapper, then parse — tolerating
-// two things that commonly break pasted schema (from Google Docs/Word):
+// Parse JSON-LD, tolerating two things that commonly break pasted schema:
 //   • curly "smart" quotes  →  straight quotes
 //   • missing commas between properties / array items on separate lines
-// Returns an object/array, or null if it still can't be parsed.
 export function parseJsonLd(raw = "") {
   if (!raw || !raw.trim()) return null;
   let s = raw.trim();
-  // remove <script ...> ... </script> wrapper if present
   const m = s.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
   if (m) s = m[1].trim();
-  // normalise curly quotes and strip stray backticks
   s = s
     .replace(/[\u201C\u201D\u2033]/g, '"')
     .replace(/[\u2018\u2019\u2032]/g, "'")
     .replace(/`/g, "");
-
-  // 1) try as-is (well-formed JSON)
-  try { return JSON.parse(s); } catch { /* fall through to tolerant pass */ }
-
-  // 2) tolerant pass: insert missing commas between a value/closing token and
-  //    the next property or item that starts on a new line, then drop any
-  //    accidental trailing commas.
+  try { return JSON.parse(s); } catch { /* tolerant pass below */ }
   let fixed = s
     .replace(/(["\d\]}]|true|false|null)(\s*\r?\n\s*)(["[{])/g, "$1,$2$3")
     .replace(/,(\s*[}\]])/g, "$1");
   try { return JSON.parse(fixed); } catch { return null; }
 }
 
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
 // ── Schema definitions ────────────────────────────────────────────────────────
-// kind "object": flat list of `fields`.   kind "list": repeatable `itemFields`.
-// build(data) returns the JSON-LD object for that schema.
+// kind "object": the editable `data` IS the JSON-LD object (template below).
+// kind "list":   repeatable rows built into a list-type schema.
 export const SCHEMA_DEFS = [
   {
     id: "faq",
     label: "FAQ Schema",
-    type: "FAQPage",
     kind: "list",
     addLabel: "Add question",
     itemFields: [
@@ -67,45 +60,28 @@ export const SCHEMA_DEFS = [
   {
     id: "blog",
     label: "Blog Schema",
-    type: "BlogPosting",
     kind: "object",
-    fields: [
-      { key: "id",            label: "Page URL (@id)",     type: "text", placeholder: "https://…/blog/slug" },
-      { key: "headline",      label: "Headline",           type: "text", placeholder: "Post headline" },
-      { key: "image",         label: "Image URL",          type: "text", placeholder: "https://…/image.webp" },
-      { key: "authorName",    label: "Author name",        type: "text", placeholder: "Novara Nature Estates" },
-      { key: "authorUrl",     label: "Author URL",         type: "text", placeholder: "https://…" },
-      { key: "publisherName", label: "Publisher name",     type: "text", placeholder: "Novara Nature Estates" },
-      { key: "publisherLogo", label: "Publisher logo URL", type: "text", placeholder: "https://…/logo.png" },
-      { key: "datePublished", label: "Date published",     type: "text", placeholder: "2026-05-20T00:00:00+05:30" },
-      { key: "dateModified",  label: "Date modified",      type: "text", placeholder: "2026-05-20T00:00:00+05:30" },
-    ],
-    build: (d) => ({
+    template: {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
-      mainEntityOfPage: { "@type": "WebPage", "@id": d.id || "" },
-      headline: d.headline || "",
-      image: d.image || "",
-      author: { "@type": "Organization", name: d.authorName || "", url: d.authorUrl || "" },
-      publisher: {
-        "@type": "Organization",
-        name: d.publisherName || "",
-        logo: { "@type": "ImageObject", url: d.publisherLogo || "" },
-      },
-      datePublished: d.datePublished || "",
-      dateModified: d.dateModified || "",
-    }),
+      mainEntityOfPage: { "@type": "WebPage", "@id": "" },
+      headline: "",
+      image: "",
+      author: { "@type": "Organization", name: "", url: "" },
+      publisher: { "@type": "Organization", name: "", logo: { "@type": "ImageObject", url: "" } },
+      datePublished: "",
+      dateModified: "",
+    },
   },
 
   {
     id: "breadcrumb",
     label: "Breadcrumb Schema",
-    type: "BreadcrumbList",
     kind: "list",
     addLabel: "Add breadcrumb",
     itemFields: [
       { key: "name", label: "Name", type: "text", placeholder: "Blogs" },
-      { key: "item", label: "URL",  type: "text", placeholder: "https://…/blogs" },
+      { key: "item", label: "URL", type: "text", placeholder: "https://…/blogs" },
     ],
     newItem: () => ({ name: "", item: "" }),
     defaultItems: [{ name: "", item: "" }],
@@ -114,122 +90,84 @@ export const SCHEMA_DEFS = [
       "@type": "BreadcrumbList",
       itemListElement: (d.items || [])
         .filter((i) => i.name || i.item)
-        .map((i, idx) => ({
-          "@type": "ListItem",
-          position: String(idx + 1),
-          name: i.name,
-          item: i.item,
-        })),
+        .map((i, idx) => ({ "@type": "ListItem", position: String(idx + 1), name: i.name, item: i.item })),
     }),
   },
 
   {
     id: "review",
     label: "Review Rating Schema",
-    type: "Product",
     kind: "object",
-    fields: [
-      { key: "ratingValue", label: "Rating value", type: "text", placeholder: "4.5" },
-      { key: "reviewCount",  label: "Review count", type: "text", placeholder: "120" },
-      { key: "bestRating",   label: "Best rating",  type: "text", placeholder: "5" },
-      { key: "worstRating",  label: "Worst rating", type: "text", placeholder: "1" },
-    ],
-    build: (d) => ({
+    template: {
       "@context": "https://schema.org",
       "@type": "Product",
+      name: "",
       aggregateRating: {
         "@type": "AggregateRating",
-        ratingValue: d.ratingValue || "",
-        reviewCount: d.reviewCount || "",
-        bestRating: d.bestRating || "",
-        worstRating: d.worstRating || "",
+        ratingValue: "",
+        reviewCount: "",
+        bestRating: "",
+        worstRating: "",
       },
-    }),
+    },
   },
 
   {
     id: "video",
     label: "Video Schema",
-    type: "VideoObject",
     kind: "object",
-    fields: [
-      { key: "name",         label: "Name",          type: "text",     placeholder: "Video title" },
-      { key: "description",  label: "Description",   type: "textarea", placeholder: "Video description…" },
-      { key: "thumbnailUrl", label: "Thumbnail URL", type: "text",     placeholder: "https://…/thumb.jpg" },
-      { key: "uploadDate",   label: "Upload date",   type: "text",     placeholder: "2026-03-26T00:01:45+05:30" },
-      { key: "duration",     label: "Duration",      type: "text",     placeholder: "PT1M17S" },
-      { key: "contentUrl",   label: "Content URL",   type: "text",     placeholder: "https://www.youtube.com/watch?v=…" },
-      { key: "embedUrl",     label: "Embed URL",     type: "text",     placeholder: "https://www.youtube.com/embed/…" },
-    ],
-    build: (d) => ({
+    template: {
       "@context": "https://schema.org",
       "@type": "VideoObject",
-      name: d.name || "",
-      description: d.description || "",
-      thumbnailUrl: d.thumbnailUrl || "",
-      uploadDate: d.uploadDate || "",
-      duration: d.duration || "",
-      contentUrl: d.contentUrl || "",
-      embedUrl: d.embedUrl || "",
-      potentialAction: {
-        "@type": "SeekToAction",
-        target: `${d.contentUrl || ""}&t={seek_to_second_number}`,
-        "startOffset-input": "required name=seek_to_second_number",
-      },
-    }),
+      name: "",
+      description: "",
+      thumbnailUrl: "",
+      uploadDate: "",
+      duration: "",
+      contentUrl: "",
+      embedUrl: "",
+    },
   },
 
   {
     id: "product",
     label: "Product Schema",
-    type: "Product",
     kind: "object",
-    fields: [
-      { key: "name",            label: "Name",             type: "text",     placeholder: "Ecovara" },
-      { key: "image",           label: "Image URL",        type: "text",     placeholder: "https://…/image.webp" },
-      { key: "description",     label: "Description",      type: "textarea", placeholder: "Product description…" },
-      { key: "brandName",       label: "Brand name",       type: "text",     placeholder: "Ecovara" },
-      { key: "sku",             label: "SKU",              type: "text",     placeholder: "ECOVARA" },
-      { key: "offerUrl",        label: "Offer URL",        type: "text",     placeholder: "https://…" },
-      { key: "priceCurrency",   label: "Price currency",   type: "text",     placeholder: "INR" },
-      { key: "price",           label: "Price",            type: "text",     placeholder: "9876000" },
-      { key: "priceValidUntil", label: "Price valid until", type: "text",    placeholder: "2026-05-31" },
-      { key: "availability",    label: "Availability",     type: "text",     placeholder: "https://schema.org/InStock" },
-      { key: "itemCondition",   label: "Item condition",   type: "text",     placeholder: "https://schema.org/NewCondition" },
-      { key: "ratingValue",     label: "Rating value",     type: "text",     placeholder: "4.9" },
-      { key: "bestRating",      label: "Best rating",      type: "text",     placeholder: "5" },
-      { key: "worstRating",     label: "Worst rating",     type: "text",     placeholder: "3" },
-      { key: "ratingCount",     label: "Rating count",     type: "text",     placeholder: "345" },
-    ],
-    build: (d) => ({
+    template: {
       "@context": "https://schema.org/",
       "@type": "Product",
-      name: d.name || "",
-      image: d.image || "",
-      description: d.description || "",
-      brand: { "@type": "Brand", name: d.brandName || "" },
-      sku: d.sku || "",
+      name: "",
+      image: "",
+      description: "",
+      brand: { "@type": "Brand", name: "" },
+      sku: "",
       offers: {
         "@type": "Offer",
-        url: d.offerUrl || "",
-        priceCurrency: d.priceCurrency || "",
-        price: d.price || "",
-        priceValidUntil: d.priceValidUntil || "",
-        availability: d.availability || "https://schema.org/InStock",
-        itemCondition: d.itemCondition || "https://schema.org/NewCondition",
+        url: "",
+        priceCurrency: "",
+        price: "",
+        priceValidUntil: "",
+        availability: "https://schema.org/InStock",
+        itemCondition: "https://schema.org/NewCondition",
       },
       aggregateRating: {
         "@type": "AggregateRating",
-        ratingValue: d.ratingValue || "",
-        bestRating: d.bestRating || "",
-        worstRating: d.worstRating || "",
-        ratingCount: d.ratingCount || "",
+        ratingValue: "",
+        bestRating: "",
+        worstRating: "",
+        ratingCount: "",
       },
-    }),
+    },
   },
 ];
 
-// Build an empty config object keyed by schema id.
+// default build for object schemas = the data object itself
+export function buildSchemaObject(def, data) {
+  if (def.kind === "list") return def.build(data || {});
+  return data || clone(def.template);
+}
+
+// Empty config keyed by schema id.
 export function initSchemas() {
   const out = {};
   for (const def of SCHEMA_DEFS) {
@@ -238,15 +176,15 @@ export function initSchemas() {
       mode: "default",
       data: def.kind === "list"
         ? { items: (def.defaultItems || []).map((x) => ({ ...x })) }
-        : {},
+        : clone(def.template),
       json: "",
     };
   }
   return out;
 }
 
-// Merge a saved config onto the full template set (so newly-added schema types
-// still appear when editing an older post).
+// Merge a saved config onto the template set (so new schema types still appear
+// when editing an older post).
 export function normalizeSchemas(saved) {
   const base = initSchemas();
   if (!saved || typeof saved !== "object") return base;
@@ -266,14 +204,14 @@ export function buildSchemaGraph(schemas = {}) {
       const parsed = parseJsonLd(cfg.json);
       if (parsed) Array.isArray(parsed) ? out.push(...parsed) : out.push(parsed);
     } else {
-      try { out.push(def.build(cfg.data || {})); } catch { /* skip invalid */ }
+      try { out.push(buildSchemaObject(def, cfg.data || {})); } catch { /* skip */ }
     }
   }
   return out;
 }
 
-// Live-page entry point. New posts use blog.schemas; old posts (no schemas) get
-// a minimal BlogPosting so nothing regresses.
+// Live-page entry point. New posts use blog.schemas; old posts get a minimal
+// BlogPosting so nothing regresses.
 export function buildBlogSchema(blog = {}) {
   if (blog.schemas) {
     const graph = buildSchemaGraph(blog.schemas);
@@ -299,81 +237,27 @@ export function buildBlogSchema(blog = {}) {
   }];
 }
 
-// Pretty JSON for the editor's "view generated" panel.
 export function schemaGraphToString(schemas) {
   return JSON.stringify(buildSchemaGraph(schemas), null, 2);
 }
 
-// Reverse of build(): map a pasted/parsed JSON-LD object back into the editable
-// `data` shape for a schema id, so an uploaded schema can be filled into the
-// Default fields and then edited field-by-field.
+// Map a pasted/parsed JSON-LD object into the editable `data` shape.
+//  • list schemas  → pull rows out of mainEntity / itemListElement
+//  • object schemas→ keep the whole object (so every key, incl. extras, shows)
 export function extractToData(id, json) {
   if (!json || typeof json !== "object") return null;
   const str = (v) => (v == null ? "" : String(v));
-  const img = (v) => (Array.isArray(v) ? str(v[0]) : str(v));
-  switch (id) {
-    case "faq":
-      return {
-        items: (json.mainEntity || []).map((q) => ({
-          name: str(q && q.name),
-          text: str(q && q.acceptedAnswer && q.acceptedAnswer.text),
-        })),
-      };
-    case "breadcrumb":
-      return {
-        items: (json.itemListElement || []).map((li) => ({
-          name: str(li && li.name),
-          item: str(li && li.item),
-        })),
-      };
-    case "blog":
-      return {
-        id: str(json.mainEntityOfPage && json.mainEntityOfPage["@id"]),
-        headline: str(json.headline),
-        image: img(json.image),
-        authorName: str(json.author && json.author.name),
-        authorUrl: str(json.author && json.author.url),
-        publisherName: str(json.publisher && json.publisher.name),
-        publisherLogo: str(json.publisher && json.publisher.logo && json.publisher.logo.url),
-        datePublished: str(json.datePublished),
-        dateModified: str(json.dateModified),
-      };
-    case "review":
-      return {
-        ratingValue: str(json.aggregateRating && json.aggregateRating.ratingValue),
-        reviewCount: str(json.aggregateRating && json.aggregateRating.reviewCount),
-        bestRating: str(json.aggregateRating && json.aggregateRating.bestRating),
-        worstRating: str(json.aggregateRating && json.aggregateRating.worstRating),
-      };
-    case "video":
-      return {
-        name: str(json.name),
-        description: str(json.description),
-        thumbnailUrl: img(json.thumbnailUrl),
-        uploadDate: str(json.uploadDate),
-        duration: str(json.duration),
-        contentUrl: str(json.contentUrl),
-        embedUrl: str(json.embedUrl),
-      };
-    case "product":
-      return {
-        name: str(json.name),
-        image: img(json.image),
-        description: str(json.description),
-        brandName: str(json.brand && json.brand.name),
-        sku: str(json.sku),
-        offerUrl: str(json.offers && json.offers.url),
-        priceCurrency: str(json.offers && json.offers.priceCurrency),
-        price: str(json.offers && json.offers.price),
-        priceValidUntil: str(json.offers && json.offers.priceValidUntil),
-        availability: str(json.offers && json.offers.availability),
-        itemCondition: str(json.offers && json.offers.itemCondition),
-        ratingValue: str(json.aggregateRating && json.aggregateRating.ratingValue),
-        bestRating: str(json.aggregateRating && json.aggregateRating.bestRating),
-        worstRating: str(json.aggregateRating && json.aggregateRating.worstRating),
-        ratingCount: str(json.aggregateRating && json.aggregateRating.ratingCount),
-      };
-    default:
-      return null;
+  if (id === "faq") {
+    return { items: (json.mainEntity || []).map((q) => ({
+      name: str(q && q.name),
+      text: str(q && q.acceptedAnswer && q.acceptedAnswer.text),
+    })) };
   }
+  if (id === "breadcrumb") {
+    return { items: (json.itemListElement || []).map((li) => ({
+      name: str(li && li.name),
+      item: str(li && li.item),
+    })) };
+  }
+  return json; // object schemas keep the full parsed object
 }

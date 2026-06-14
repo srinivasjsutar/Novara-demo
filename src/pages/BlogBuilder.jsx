@@ -897,6 +897,39 @@ function BlogEditor({ editingBlog, onBack }) {
   const enabledSchemaCount = useMemo(
     () => Object.values(schemas).filter((s) => s.enabled).length, [schemas]);
 
+  // Flatten an object schema's data into editable leaf rows {path,value} and
+  // write a value back by its dot path (so every key shows and stays editable).
+  const flattenLeaves = (obj, prefix = "") => {
+    let rows = [];
+    Object.entries(obj || {}).forEach(([k, v]) => {
+      const path = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        rows = rows.concat(flattenLeaves(v, path));
+      } else if (Array.isArray(v)) {
+        rows.push({ path, value: JSON.stringify(v) });
+      } else {
+        rows.push({ path, value: v == null ? "" : String(v) });
+      }
+    });
+    return rows;
+  };
+  const setSchemaPath = (id, path, value) =>
+    setSchemas((p) => {
+      const keys = path.split(".");
+      const root = { ...(p[id].data || {}) };
+      let cur = root;
+      for (let i = 0; i < keys.length - 1; i++) {
+        cur[keys[i]] = (cur[keys[i]] && typeof cur[keys[i]] === "object") ? { ...cur[keys[i]] } : {};
+        cur = cur[keys[i]];
+      }
+      cur[keys[keys.length - 1]] = value;
+      return { ...p, [id]: { ...p[id], data: root } };
+    });
+  const pathLabel = (path) => {
+    const parts = path.split(".");
+    return { key: parts[parts.length - 1], parent: parts.slice(0, -1).join(" › ") };
+  };
+
   // ── Preview sections ──────────────────────────────────────────────────────
   const previewSections = useMemo(() => {
     if (!previewMode) return [];
@@ -1144,26 +1177,33 @@ function BlogEditor({ editingBlog, onBack }) {
                                   </div>
                                 </>
                               ) : def.kind === "object" ? (
-                                /* ── Default mode: fixed key→value fields ── */
+                                /* ── Default mode: editable key→value pairs of the schema ── */
                                 <div>
                                 {schemaSavedId === def.id && (
                                   <p className="mb-2 text-[11px] text-[#1B9A63] font-semibold">✓ Saved — values loaded below, edit as needed.</p>
                                 )}
-                                <div className="grid grid-cols-[140px_1fr] gap-x-2 gap-y-2 items-start">
-                                  {def.fields.map((f) => (
-                                    <React.Fragment key={f.key}>
-                                      <span className="text-[11px] font-semibold text-[#50575e] pt-2">{f.label}</span>
-                                      {f.type === "textarea" ? (
-                                        <textarea rows={2} value={cfg.data[f.key] || ""} placeholder={f.placeholder}
-                                          onChange={(e) => setSchemaField(def.id, f.key, e.target.value)}
-                                          className="wp-input resize-y" />
-                                      ) : (
-                                        <input value={cfg.data[f.key] || ""} placeholder={f.placeholder}
-                                          onChange={(e) => setSchemaField(def.id, f.key, e.target.value)}
-                                          className="wp-input" />
-                                      )}
-                                    </React.Fragment>
-                                  ))}
+                                <div className="grid grid-cols-[150px_1fr] gap-x-2 gap-y-2 items-start">
+                                  {flattenLeaves(cfg.data).map(({ path, value }) => {
+                                    const { key, parent } = pathLabel(path);
+                                    const long = typeof value === "string" && value.length > 60;
+                                    return (
+                                      <React.Fragment key={path}>
+                                        <span className="text-[11px] pt-2 leading-tight">
+                                          <span className="font-semibold text-[#1d2327]">{key}</span>
+                                          {parent && <span className="block text-[10px] text-[#a7aaad]">{parent}</span>}
+                                        </span>
+                                        {long ? (
+                                          <textarea rows={3} value={value}
+                                            onChange={(e) => setSchemaPath(def.id, path, e.target.value)}
+                                            className="wp-input resize-y" />
+                                        ) : (
+                                          <input value={value}
+                                            onChange={(e) => setSchemaPath(def.id, path, e.target.value)}
+                                            className="wp-input" />
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
                                 </div>
                                 </div>
                               ) : (
