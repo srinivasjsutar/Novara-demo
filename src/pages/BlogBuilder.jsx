@@ -1000,7 +1000,22 @@ function BlogEditor({ editingBlog, onBack }) {
             <span className="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{meta.category}</span>
             <h1 className="mt-3 text-[26px] sm:text-[34px] font-bold text-[#111827] leading-tight">{meta.title || "Untitled post"}</h1>
             <div className="mt-2 text-[13px] text-slate-500 flex items-center gap-3"><span>{meta.author}</span><span className="h-1 w-1 rounded-full bg-slate-300" /><span>{meta.date}</span></div>
-            {meta.heroImage && <img src={meta.heroImage} alt={meta.imageAlt} className="mt-5 w-full rounded-2xl border border-slate-100 object-cover" />}
+            {meta.heroImage && (
+              <figure className="mt-5">
+                <div className="relative rounded-2xl overflow-hidden border border-slate-100 group">
+                  <img src={meta.heroImage} alt={meta.imageAlt} title={meta.imageTitle || undefined} className="w-full object-cover" />
+                  {getYouTubeId(meta.videoUrl) && (
+                    <button type="button" onClick={() => setVideoPopupOpen(true)} aria-label="Play video"
+                      className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition-colors">
+                      <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                        <svg viewBox="0 0 24 24" fill="#E3A600" width="30" height="30"><path d="M8 5v14l11-7z" /></svg>
+                      </span>
+                    </button>
+                  )}
+                </div>
+                {meta.imageCaption && <figcaption className="mt-2 text-[13px] text-slate-500 text-center">{meta.imageCaption}</figcaption>}
+              </figure>
+            )}
             <div className="mt-7 space-y-5">
               {(() => { const used = new Map(); return previewSections.map((s, i) => <PreviewSection key={i} s={s} usedH3={used} />); })()}
             </div>
