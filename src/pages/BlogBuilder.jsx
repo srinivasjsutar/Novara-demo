@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BLOGS } from "../data/blogs";
-import { SCHEMA_DEFS, initSchemas, normalizeSchemas, schemaGraphToString, parseJsonLd } from "../utils/schema";
+import { SCHEMA_DEFS, initSchemas, normalizeSchemas, schemaGraphToString, parseJsonLd, extractToData } from "../utils/schema";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API_BASE =
@@ -470,6 +470,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const [color, setColor] = useState("#111827");
   const [imageUploading, setImageUploading] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
+  const [heroPreview, setHeroPreview] = useState("");
 
   const [previewMode, setPreviewMode] = useState(false);
   const [activeNav, setActiveNav] = useState("blog");
@@ -711,12 +712,20 @@ function BlogEditor({ editingBlog, onBack }) {
 
   const handleHeroImage = async (file) => {
     if (!file) return;
+    // instant local thumbnail while the upload runs
+    let localPreview = "";
+    try { localPreview = URL.createObjectURL(file); setHeroPreview(localPreview); } catch (_) {}
     setHeroUploading(true);
     try {
       const url = await compressAndUpload(file, { maxW: 1400, quality: 0.82 });
       setMeta((p) => ({ ...p, heroImage: url }));
     } catch (e) { alert("Featured image upload failed: " + e.message); }
-    finally { setHeroUploading(false); if (heroInputRef.current) heroInputRef.current.value = ""; }
+    finally {
+      setHeroUploading(false);
+      setHeroPreview("");
+      if (localPreview) { try { URL.revokeObjectURL(localPreview); } catch (_) {} }
+      if (heroInputRef.current) heroInputRef.current.value = "";
+    }
   };
 
   // ── Export / publish ──────────────────────────────────────────────────────
@@ -867,6 +876,21 @@ function BlogEditor({ editingBlog, onBack }) {
     setSchemas((p) => ({ ...p, [id]: { ...p[id], data: { ...p[id].data, items: [...(p[id].data.items || []), def.newItem()] } } }));
   const removeSchemaItem = (id, idx) =>
     setSchemas((p) => ({ ...p, [id]: { ...p[id], data: { ...p[id].data, items: (p[id].data.items || []).filter((_, k) => k !== idx) } } }));
+
+  // Save a pasted (Upload) schema: parse it, fill the Default fields with its
+  // values, and switch to Default mode so the blogger can edit field-by-field.
+  const [schemaSavedId, setSchemaSavedId] = useState(null);
+  const saveUploadedSchema = (def) => {
+    const cfg = schemas[def.id];
+    const parsed = parseJsonLd(cfg.json);
+    const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!obj) return; // invalid JSON — the ⚠ indicator already shows
+    const data = extractToData(def.id, obj);
+    if (!data) return;
+    setSchemaCfg(def.id, { data, mode: "default" });
+    setSchemaSavedId(def.id);
+    setTimeout(() => setSchemaSavedId((cur) => (cur === def.id ? null : cur)), 2500);
+  };
 
   // Combined JSON-LD preview of every enabled schema
   const jsonLdPreview = useMemo(() => schemaGraphToString(schemas), [schemas]);
@@ -1101,14 +1125,30 @@ function BlogEditor({ editingBlog, onBack }) {
                                     className="wp-input resize-y"
                                     style={{ fontFamily: "ui-monospace, monospace", fontSize: "11px" }}
                                   />
-                                  {cfg.json.trim() && (
-                                    parseJsonLd(cfg.json)
-                                      ? <span className="text-[11px] text-[#1B9A63] mt-1 block">✓ Valid JSON-LD</span>
-                                      : <span className="text-[11px] text-[#b32d2e] mt-1 block">⚠ Invalid JSON — check the syntax.</span>
-                                  )}
+                                  <div className="mt-2 flex items-center justify-between gap-2">
+                                    <span className="text-[11px]">
+                                      {cfg.json.trim()
+                                        ? (parseJsonLd(cfg.json)
+                                            ? <span className="text-[#1B9A63]">✓ Valid JSON-LD</span>
+                                            : <span className="text-[#b32d2e]">⚠ Invalid JSON — check the syntax.</span>)
+                                        : <span className="text-[#787c82]">Paste a schema, then Save to load it into the editable fields.</span>}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => saveUploadedSchema(def)}
+                                      disabled={!cfg.json.trim() || !parseJsonLd(cfg.json)}
+                                      className="wp-button-primary disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                    >
+                                      Save &amp; edit
+                                    </button>
+                                  </div>
                                 </>
                               ) : def.kind === "object" ? (
                                 /* ── Default mode: fixed key→value fields ── */
+                                <div>
+                                {schemaSavedId === def.id && (
+                                  <p className="mb-2 text-[11px] text-[#1B9A63] font-semibold">✓ Saved — values loaded below, edit as needed.</p>
+                                )}
                                 <div className="grid grid-cols-[140px_1fr] gap-x-2 gap-y-2 items-start">
                                   {def.fields.map((f) => (
                                     <React.Fragment key={f.key}>
@@ -1125,9 +1165,13 @@ function BlogEditor({ editingBlog, onBack }) {
                                     </React.Fragment>
                                   ))}
                                 </div>
+                                </div>
                               ) : (
                                 /* ── Default mode: repeatable items (FAQ / breadcrumb) ── */
                                 <div className="space-y-2">
+                                  {schemaSavedId === def.id && (
+                                    <p className="text-[11px] text-[#1B9A63] font-semibold">✓ Saved — values loaded, edit as needed.</p>
+                                  )}
                                   {(cfg.data.items || []).map((it, idx) => (
                                     <div key={idx} className="border border-[#dcdcde] rounded p-2 space-y-1.5">
                                       <div className="flex items-center justify-between">
@@ -1227,11 +1271,16 @@ function BlogEditor({ editingBlog, onBack }) {
                 <div className="meta-box-head"><span className="meta-box-title">Featured image</span></div>
                 <div className="p-3">
                   {/* Thumbnail preview — shows play overlay when a video URL is set */}
-                  {meta.heroImage ? (
+                  {(meta.heroImage || heroPreview) ? (
                     <div className="relative group">
-                      <img src={meta.heroImage} alt="featured" className="w-full h-28 object-cover rounded border border-slate-100" />
+                      <img src={meta.heroImage || heroPreview} alt="featured" className="w-full h-28 object-cover rounded border border-slate-100" />
+                      {heroUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded bg-black/40 text-white text-[11px] font-semibold gap-2">
+                          <Loader size={13} className="animate-spin" /> Uploading…
+                        </div>
+                      )}
                       {/* Play overlay — only shown when videoUrl is filled */}
-                      {meta.videoUrl && (
+                      {meta.videoUrl && !heroUploading && (
                         <button
                           type="button"
                           onClick={() => setVideoPopupOpen(true)}

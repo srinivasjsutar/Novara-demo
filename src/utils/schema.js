@@ -6,19 +6,33 @@
 // Shared by the builder (UI + preview) and the live page (+Head) so the preview
 // always matches what ships.
 
-// Strip a <script type="application/ld+json"> wrapper, normalise smart quotes,
-// and parse. Returns an object/array, or null if it can't be parsed.
+// Strip a <script type="application/ld+json"> wrapper, then parse — tolerating
+// two things that commonly break pasted schema (from Google Docs/Word):
+//   • curly "smart" quotes  →  straight quotes
+//   • missing commas between properties / array items on separate lines
+// Returns an object/array, or null if it still can't be parsed.
 export function parseJsonLd(raw = "") {
   if (!raw || !raw.trim()) return null;
   let s = raw.trim();
   // remove <script ...> ... </script> wrapper if present
   const m = s.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
   if (m) s = m[1].trim();
-  // normalise curly quotes that often sneak in from docs
-  s = s.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
-  // strip stray backticks
-  s = s.replace(/`/g, "");
-  try { return JSON.parse(s); } catch { return null; }
+  // normalise curly quotes and strip stray backticks
+  s = s
+    .replace(/[\u201C\u201D\u2033]/g, '"')
+    .replace(/[\u2018\u2019\u2032]/g, "'")
+    .replace(/`/g, "");
+
+  // 1) try as-is (well-formed JSON)
+  try { return JSON.parse(s); } catch { /* fall through to tolerant pass */ }
+
+  // 2) tolerant pass: insert missing commas between a value/closing token and
+  //    the next property or item that starts on a new line, then drop any
+  //    accidental trailing commas.
+  let fixed = s
+    .replace(/(["\d\]}]|true|false|null)(\s*\r?\n\s*)(["[{])/g, "$1,$2$3")
+    .replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(fixed); } catch { return null; }
 }
 
 // ── Schema definitions ────────────────────────────────────────────────────────
@@ -288,4 +302,78 @@ export function buildBlogSchema(blog = {}) {
 // Pretty JSON for the editor's "view generated" panel.
 export function schemaGraphToString(schemas) {
   return JSON.stringify(buildSchemaGraph(schemas), null, 2);
+}
+
+// Reverse of build(): map a pasted/parsed JSON-LD object back into the editable
+// `data` shape for a schema id, so an uploaded schema can be filled into the
+// Default fields and then edited field-by-field.
+export function extractToData(id, json) {
+  if (!json || typeof json !== "object") return null;
+  const str = (v) => (v == null ? "" : String(v));
+  const img = (v) => (Array.isArray(v) ? str(v[0]) : str(v));
+  switch (id) {
+    case "faq":
+      return {
+        items: (json.mainEntity || []).map((q) => ({
+          name: str(q && q.name),
+          text: str(q && q.acceptedAnswer && q.acceptedAnswer.text),
+        })),
+      };
+    case "breadcrumb":
+      return {
+        items: (json.itemListElement || []).map((li) => ({
+          name: str(li && li.name),
+          item: str(li && li.item),
+        })),
+      };
+    case "blog":
+      return {
+        id: str(json.mainEntityOfPage && json.mainEntityOfPage["@id"]),
+        headline: str(json.headline),
+        image: img(json.image),
+        authorName: str(json.author && json.author.name),
+        authorUrl: str(json.author && json.author.url),
+        publisherName: str(json.publisher && json.publisher.name),
+        publisherLogo: str(json.publisher && json.publisher.logo && json.publisher.logo.url),
+        datePublished: str(json.datePublished),
+        dateModified: str(json.dateModified),
+      };
+    case "review":
+      return {
+        ratingValue: str(json.aggregateRating && json.aggregateRating.ratingValue),
+        reviewCount: str(json.aggregateRating && json.aggregateRating.reviewCount),
+        bestRating: str(json.aggregateRating && json.aggregateRating.bestRating),
+        worstRating: str(json.aggregateRating && json.aggregateRating.worstRating),
+      };
+    case "video":
+      return {
+        name: str(json.name),
+        description: str(json.description),
+        thumbnailUrl: img(json.thumbnailUrl),
+        uploadDate: str(json.uploadDate),
+        duration: str(json.duration),
+        contentUrl: str(json.contentUrl),
+        embedUrl: str(json.embedUrl),
+      };
+    case "product":
+      return {
+        name: str(json.name),
+        image: img(json.image),
+        description: str(json.description),
+        brandName: str(json.brand && json.brand.name),
+        sku: str(json.sku),
+        offerUrl: str(json.offers && json.offers.url),
+        priceCurrency: str(json.offers && json.offers.priceCurrency),
+        price: str(json.offers && json.offers.price),
+        priceValidUntil: str(json.offers && json.offers.priceValidUntil),
+        availability: str(json.offers && json.offers.availability),
+        itemCondition: str(json.offers && json.offers.itemCondition),
+        ratingValue: str(json.aggregateRating && json.aggregateRating.ratingValue),
+        bestRating: str(json.aggregateRating && json.aggregateRating.bestRating),
+        worstRating: str(json.aggregateRating && json.aggregateRating.worstRating),
+        ratingCount: str(json.aggregateRating && json.aggregateRating.ratingCount),
+      };
+    default:
+      return null;
+  }
 }
