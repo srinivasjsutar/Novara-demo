@@ -548,6 +548,12 @@ function BlogEditor({ editingBlog, onBack }) {
       tags:             (editingBlog.tags || []).join(", "),
     });
     setSchemas(normalizeSchemas(editingBlog.schemas));
+    // Seed the image→video map from existing sections
+    (editingBlog.sections || []).forEach((s) => {
+      if (s.type === "image" && s.src && s.videoUrl) {
+        imageVideoMapRef.current[s.src] = s.videoUrl;
+      }
+    });
     const html = sectionsToHtml(editingBlog.sections || []);
     if (bodyRef.current) bodyRef.current.innerHTML = html;
   }, [editingBlog]);
@@ -717,6 +723,8 @@ function BlogEditor({ editingBlog, onBack }) {
     fileInputRef.current?.click();
   };
 
+  const imageVideoMapRef = useRef({}); // maps imageUrl → youTubeUrl
+
   const handleContentImage = async (file) => {
     if (!file) return;
     setImageUploading(true);
@@ -725,12 +733,12 @@ function BlogEditor({ editingBlog, onBack }) {
       // Ask for optional YouTube URL for this image
       const ytUrl = window.prompt("YouTube video URL for this image (optional — leave blank to skip):", "") || "";
       const ytId = getYouTubeId(ytUrl);
+      // Store the mapping so it survives contentEditable sanitization
+      if (ytId) imageVideoMapRef.current[url] = ytUrl;
       focusBody();
       const sel = window.getSelection();
       if (savedSelection.current) { sel.removeAllRanges(); sel.addRange(savedSelection.current); }
-      // Embed videoUrl as a data attribute on the figure so it round-trips through htmlToSections
-      const dataAttr = ytId ? ` data-video-url="${ytUrl.replace(/"/g, "&quot;")}"` : "";
-      const figure = `<figure${dataAttr}><img src="${url}" alt="" /><figcaption>Add a caption…</figcaption></figure><p><br/></p>`;
+      const figure = `<figure><img src="${url}" alt="" /><figcaption>Add a caption…</figcaption></figure><p><br/></p>`;
       document.execCommand("insertHTML", false, figure);
     } catch (e) { alert("Image upload failed: " + e.message); }
     finally { setImageUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
@@ -757,7 +765,13 @@ function BlogEditor({ editingBlog, onBack }) {
   // ── Export / publish ──────────────────────────────────────────────────────
   const exportBlogData = () => {
     const html = bodyRef.current ? bodyRef.current.innerHTML : initialHtml.current;
-    const sections = htmlToSections(html);
+    const rawSections = htmlToSections(html);
+    // Attach stored YouTube URLs to image sections before publishing
+    const sections = rawSections.map((s) =>
+      s.type === "image" && s.src && imageVideoMapRef.current[s.src]
+        ? { ...s, videoUrl: imageVideoMapRef.current[s.src] }
+        : s
+    );
     const title = meta.title;
     const slug  = meta.slug || slugify(title) || `blog-${Date.now()}`;
     const tagsArr = meta.tags ? meta.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
@@ -960,7 +974,13 @@ function BlogEditor({ editingBlog, onBack }) {
   const previewSections = useMemo(() => {
     if (!previewMode) return [];
     const html = bodyRef.current ? bodyRef.current.innerHTML : "";
-    return htmlToSections(html);
+    const sections = htmlToSections(html);
+    // Attach stored YouTube URLs to image sections
+    return sections.map((s) =>
+      s.type === "image" && s.src && imageVideoMapRef.current[s.src]
+        ? { ...s, videoUrl: imageVideoMapRef.current[s.src] }
+        : s
+    );
   }, [previewMode]);
 
   // ─────────────────────────────────────────────────────────────────────────
