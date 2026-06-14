@@ -115,7 +115,7 @@ const sectionsToHtml = (sections = []) =>
       return `<ol>${(s.text || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ol>`;
 
     if (s.type === "image")
-      return `<figure><img src="${escapeHtml(s.src || "")}" alt="${escapeHtml(s.caption || "")}" />${s.caption ? `<figcaption>${escapeHtml(s.caption)}</figcaption>` : ""}</figure>`;
+      return `<figure${s.videoUrl ? ` data-video-url="${escapeHtml(s.videoUrl)}"` : ""}><img src="${escapeHtml(s.src || "")}" alt="${escapeHtml(s.caption || "")}" />${s.caption ? `<figcaption>${escapeHtml(s.caption)}</figcaption>` : ""}</figure>`;
 
     if (s.type === "table") {
       const head = `<thead><tr>${(s.headers || []).map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>`;
@@ -164,7 +164,8 @@ const htmlToSections = (html = "") => {
     if (tag === "figure" || tag === "img" || (img && !hasRealText(node))) {
       const src = (tag === "img" ? node.getAttribute("src") : img?.getAttribute("src")) || "";
       const cap = node.querySelector ? (node.querySelector("figcaption")?.textContent.trim() || "") : "";
-      if (src) out.push({ type: "image", src, caption: cap });
+      const videoUrl = (tag === "figure" ? node.getAttribute("data-video-url") : null) || "";
+      if (src) out.push({ type: "image", src, caption: cap, videoUrl });
       return;
     }
     if (tag === "table") {
@@ -189,7 +190,7 @@ const htmlToSections = (html = "") => {
 };
 
 // ─── Preview renderer (mirrors BlogDetails) ───────────────────────────────────
-function PreviewSection({ s, usedH3 }) {
+function PreviewSection({ s, usedH3, onPlayVideo }) {
   if (["h1","h2","h3","h4","h5","h6"].includes(s.type)) {
     const base = slugify(s.text || "");
     const count = (usedH3.get(base) || 0) + 1; usedH3.set(base, count);
@@ -203,7 +204,28 @@ function PreviewSection({ s, usedH3 }) {
   if (s.type === "quote")
     return <div className="rounded-xl border border-[#F2E6C9] bg-[#FFF8E8] px-4 py-4 text-[14px] text-slate-700"><div className="border-l-4 border-[#E3A600] pl-3 italic leading-relaxed">{s.text}</div></div>;
   if (s.type === "image")
-    return <figure className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">{s.src ? <img src={s.src} alt={s.caption || ""} className="w-full h-auto" /> : null}{s.caption && <figcaption className="px-4 py-3 text-[12px] text-slate-500">{s.caption}</figcaption>}</figure>;
+    return (
+      <figure className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 relative group">
+        {s.src ? (
+          <div className="relative">
+            <img src={s.src} alt={s.caption || ""} className="w-full h-auto" />
+            {s.videoUrl && getYouTubeId(s.videoUrl) && (
+              <button
+                type="button"
+                onClick={() => onPlayVideo && onPlayVideo(s.videoUrl)}
+                className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition-colors"
+                aria-label="Play video"
+              >
+                <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <svg viewBox="0 0 24 24" fill="#E3A600" width="26" height="26"><path d="M8 5v14l11-7z" /></svg>
+                </span>
+              </button>
+            )}
+          </div>
+        ) : null}
+        {s.caption && <figcaption className="px-4 py-3 text-[12px] text-slate-500">{s.caption}</figcaption>}
+      </figure>
+    );
   if (s.type === "ul")
     return <ul className="list-disc list-outside pl-5 space-y-2 text-[14px] text-slate-600">{(s.text || []).map((i, k) => <li key={k}>{i}</li>)}</ul>;
   if (s.type === "ol")
@@ -479,7 +501,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const [showSchema, setShowSchema] = useState(true);
   const [showJsonLd, setShowJsonLd] = useState(false);
   const [schemas, setSchemas] = useState(() => initSchemas());
-  const [videoPopupOpen, setVideoPopupOpen] = useState(false);
+  const [imageVideoPopup, setImageVideoPopup] = useState(null); // { videoUrl } for content image lightbox
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishMsg, setPublishMsg] = useState("");
@@ -700,10 +722,15 @@ function BlogEditor({ editingBlog, onBack }) {
     setImageUploading(true);
     try {
       const url = await compressAndUpload(file, { maxW: 1200, quality: 0.8 });
+      // Ask for optional YouTube URL for this image
+      const ytUrl = window.prompt("YouTube video URL for this image (optional — leave blank to skip):", "") || "";
+      const ytId = getYouTubeId(ytUrl);
       focusBody();
       const sel = window.getSelection();
       if (savedSelection.current) { sel.removeAllRanges(); sel.addRange(savedSelection.current); }
-      const figure = `<figure><img src="${url}" alt="" /><figcaption>Add a caption…</figcaption></figure><p><br/></p>`;
+      // Embed videoUrl as a data attribute on the figure so it round-trips through htmlToSections
+      const dataAttr = ytId ? ` data-video-url="${ytUrl.replace(/"/g, "&quot;")}"` : "";
+      const figure = `<figure${dataAttr}><img src="${url}" alt="" /><figcaption>Add a caption…</figcaption></figure><p><br/></p>`;
       document.execCommand("insertHTML", false, figure);
     } catch (e) { alert("Image upload failed: " + e.message); }
     finally { setImageUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
@@ -1010,24 +1037,60 @@ function BlogEditor({ editingBlog, onBack }) {
               <figure className="mt-5">
                 <div className="relative rounded-2xl overflow-hidden border border-slate-100 group">
                   <img src={meta.heroImage} alt={meta.imageAlt} title={meta.imageTitle || undefined} className="w-full object-cover" />
-                  {getYouTubeId(meta.videoUrl) && (
-                    <button type="button" onClick={() => setVideoPopupOpen(true)} aria-label="Play video"
-                      className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition-colors">
-                      <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                        <svg viewBox="0 0 24 24" fill="#E3A600" width="30" height="30"><path d="M8 5v14l11-7z" /></svg>
-                      </span>
-                    </button>
-                  )}
                 </div>
                 {meta.imageCaption && <figcaption className="mt-2 text-[13px] text-slate-500 text-center">{meta.imageCaption}</figcaption>}
               </figure>
             )}
             <div className="mt-7 space-y-5">
-              {(() => { const used = new Map(); return previewSections.map((s, i) => <PreviewSection key={i} s={s} usedH3={used} />); })()}
+              {(() => {
+                const used = new Map();
+                return previewSections.map((s, i) => (
+                  <PreviewSection key={i} s={s} usedH3={used} onPlayVideo={(url) => setImageVideoPopup({ videoUrl: url })} />
+                ));
+              })()}
             </div>
           </article>
         </div>
       )}
+
+      {/* ── CONTENT IMAGE VIDEO LIGHTBOX ──────────────────────────── */}
+      {imageVideoPopup && (() => {
+        const vid = getYouTubeId(imageVideoPopup.videoUrl);
+        return (
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.85)" }}
+            onClick={() => setImageVideoPopup(null)}
+          >
+            <div
+              className="relative w-full max-w-3xl mx-4"
+              style={{ aspectRatio: "16/9" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setImageVideoPopup(null)}
+                className="absolute -top-9 right-0 text-white text-sm font-semibold flex items-center gap-1.5 hover:text-[#E3A600] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Close
+              </button>
+              {vid ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${vid}?autoplay=1&rel=0`}
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
+                  className="w-full h-full rounded-xl border-0"
+                  title="YouTube video"
+                />
+              ) : (
+                <div className="w-full h-full rounded-xl bg-[#15302A] flex items-center justify-center text-white text-sm">
+                  Invalid YouTube URL — cannot preview.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="flex min-h-screen nv-root">
         {/* ── LEFT NAV (Novara) ──────────────────────────────── */}
@@ -1346,19 +1409,6 @@ function BlogEditor({ editingBlog, onBack }) {
                         </div>
                       )}
                       {/* Play overlay — only shown when videoUrl is filled */}
-                      {meta.videoUrl && !heroUploading && (
-                        <button
-                          type="button"
-                          onClick={() => setVideoPopupOpen(true)}
-                          className="absolute inset-0 flex items-center justify-center rounded bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Preview video"
-                        >
-                          <span className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                            <svg viewBox="0 0 24 24" fill="#E3A600" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>
-                          </span>
-                          <span className="absolute bottom-1.5 left-2 text-[10px] text-white font-semibold drop-shadow">Video thumbnail</span>
-                        </button>
-                      )}
                       <button onClick={() => setMeta((p) => ({ ...p, heroImage: "" }))} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 z-10">×</button>
                     </div>
                   ) : (
@@ -1398,78 +1448,9 @@ function BlogEditor({ editingBlog, onBack }) {
                       <textarea rows={2} value={meta.imageDescription} onChange={(e) => setMeta((p) => ({ ...p, imageDescription: e.target.value }))} placeholder="Longer description of the image"
                         className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] resize-none" />
                     </label>
-
-                    {/* ── Video / YouTube link ── */}
-                    <div className="pt-1 border-t border-[#F4F1E8]">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63] flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" fill="#FF0000" width="13" height="13"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.2 31.2 0 0 0 0 12a31.2 31.2 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.2 31.2 0 0 0 24 12a31.2 31.2 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-                        YouTube video URL
-                      </span>
-                      <input
-                        value={meta.videoUrl}
-                        onChange={(e) => setMeta((p) => ({ ...p, videoUrl: e.target.value }))}
-                        placeholder="https://youtube.com/watch?v=… or youtu.be/…"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
-                      />
-                      {meta.videoUrl && (() => {
-                        const vid = getYouTubeId(meta.videoUrl);
-                        return vid ? (
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span className="text-[10px] text-[#1B9A63] font-semibold flex items-center gap-1">
-                              <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M9 16.2l-4.2-4.2L3.4 13.4 9 19 21 7l-1.4-1.4z"/></svg>
-                              Valid YouTube ID: {vid}
-                            </span>
-                            <button type="button" onClick={() => setVideoPopupOpen(true)}
-                              className="text-[10px] text-[#1A614F] underline">Preview</button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-[#b32d2e] mt-1 block">⚠ Couldn't detect a YouTube video ID — check the URL.</span>
-                        );
-                      })()}
-                      <p className="text-[10px] text-[#787c82] mt-1">When set, the featured image acts as a video thumbnail. Readers can click it to watch the video in a lightbox.</p>
-                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* ── YouTube video lightbox popup ── */}
-              {videoPopupOpen && (() => {
-                const vid = getYouTubeId(meta.videoUrl);
-                return (
-                  <div
-                    className="fixed inset-0 z-[200] flex items-center justify-center"
-                    style={{ background: "rgba(0,0,0,0.82)" }}
-                    onClick={() => setVideoPopupOpen(false)}
-                  >
-                    <div
-                      className="relative w-full max-w-3xl mx-4"
-                      style={{ aspectRatio: "16/9" }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => setVideoPopupOpen(false)}
-                        className="absolute -top-9 right-0 text-white text-sm font-semibold flex items-center gap-1.5 hover:text-[#E3A600] transition-colors"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        Close
-                      </button>
-                      {vid ? (
-                        <iframe
-                          src={`https://www.youtube.com/embed/${vid}?autoplay=1&rel=0`}
-                          allow="autoplay; fullscreen"
-                          allowFullScreen
-                          className="w-full h-full rounded-xl border-0"
-                          title="YouTube video preview"
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-xl bg-[#15302A] flex items-center justify-center text-white text-sm">
-                          Invalid YouTube URL — cannot preview.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* POST SETTINGS / SEO BOX */}
               <div className="meta-box">
