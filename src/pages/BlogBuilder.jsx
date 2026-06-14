@@ -240,7 +240,7 @@ function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ fontFamily: "'Urbanist', sans-serif", background: "#f0f0f1" }}>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ fontFamily: "'Urbanist', sans-serif", background: "#F4F1E8" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap');`}</style>
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
@@ -261,13 +261,13 @@ function LoginScreen() {
               <label className="block mb-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Email address</label>
               <input type="email" value={form.email} placeholder="blogger@gmail.com" autoFocus
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2271b1]/30 focus:border-[#2271b1]" />
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#1A614F]/30 focus:border-[#1A614F]" />
             </div>
             <div>
               <label className="block mb-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Password</label>
               <input type="password" value={form.password} placeholder="••••••••"
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2271b1]/30 focus:border-[#2271b1]" />
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#1A614F]/30 focus:border-[#1A614F]" />
             </div>
             <button type="submit" disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white text-sm transition-all disabled:opacity-60 shadow-md hover:shadow-lg"
@@ -295,7 +295,7 @@ function BlogPicker({ onSelect }) {
   );
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: "'Urbanist', sans-serif", background: "#f0f0f1" }}>
+    <div className="min-h-screen" style={{ fontFamily: "'Urbanist', sans-serif", background: "#F4F1E8" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap');`}</style>
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-3">
@@ -364,14 +364,13 @@ function BlogPicker({ onSelect }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // TOOLBAR
 // ═════════════════════════════════════════════════════════════════════════════
-const SWATCHES = ["#111827", "#1A614F", "#E3A600", "#2271b1", "#b32d2e", "#6b7280", "#ffffff"];
+const SWATCHES = ["#111827", "#1A614F", "#E3A600", "#1A614F", "#b32d2e", "#6b7280", "#ffffff"];
 
 function ToolbarButton({ title, onClick, active, children }) {
   return (
     <button type="button" title={title}
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
-      className={`h-8 min-w-8 px-1.5 flex items-center justify-center rounded-[3px] text-[#3c434a] border border-transparent transition-colors
-        ${active ? "bg-[#dcdcde] border-[#c3c4c7]" : "hover:bg-[#f0f0f1] hover:border-[#c3c4c7]"}`}>
+      className={`nv-toolbtn ${active ? "active" : ""}`}>
       {children}
     </button>
   );
@@ -379,17 +378,17 @@ function ToolbarButton({ title, onClick, active, children }) {
 
 function Toolbar({ exec, onLink, onUnlink, onImage, format, setFormat, color, setColor, imageUploading }) {
   const [colorOpen, setColorOpen] = useState(false);
-  const sep = <span className="mx-0.5 w-px self-stretch my-1 bg-[#dcdcde]" />;
+  const sep = <span className="mx-0.5 w-px self-stretch my-1 bg-[#E6E1D3]" />;
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-[#dcdcde] bg-[#f6f7f7] rounded-t-[3px]">
+    <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-[#F0EBDD] bg-[#FCFBF6] rounded-t-[18px]">
       {/* Format / Paragraph + H1–H6 */}
       <div className="relative">
         <select
           value={format}
           onChange={(e) => { setFormat(e.target.value); }}
-          className="h-8 pl-2 pr-7 text-[13px] text-[#3c434a] bg-white border border-[#c3c4c7] rounded-[3px] appearance-none cursor-pointer focus:outline-none focus:border-[#2271b1]"
-          style={{ minWidth: 118 }}
+          className="h-9 pl-3 pr-8 text-[13px] font-medium text-[#2F4A40] bg-white border border-[#E2DCCB] rounded-[9px] appearance-none cursor-pointer focus:outline-none focus:border-[#1A614F]"
+          style={{ minWidth: 124 }}
         >
           <option value="p">Paragraph</option>
           <option value="h1">Heading 1</option>
@@ -399,7 +398,7 @@ function Toolbar({ exec, onLink, onUnlink, onImage, format, setFormat, color, se
           <option value="h5">Heading 5</option>
           <option value="h6">Heading 6</option>
         </select>
-        <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#3c434a]" />
+        <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#2F4A40]" />
       </div>
       {sep}
 
@@ -431,7 +430,7 @@ function Toolbar({ exec, onLink, onUnlink, onImage, format, setFormat, color, se
           </span>
         </ToolbarButton>
         {colorOpen && (
-          <div className="absolute z-30 mt-1 p-2 bg-white border border-[#c3c4c7] rounded-md shadow-lg" onMouseDown={(e) => e.preventDefault()}>
+          <div className="absolute z-30 mt-1 p-2 bg-white border border-[#DDD7C7] rounded-md shadow-lg" onMouseDown={(e) => e.preventDefault()}>
             <div className="grid grid-cols-4 gap-1.5 mb-2">
               {SWATCHES.map((c) => (
                 <button key={c} type="button" title={c}
@@ -945,48 +944,55 @@ function BlogEditor({ editingBlog, onBack }) {
   ];
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: "'Urbanist', sans-serif", background: "#f0f0f1" }}>
+    <div className="min-h-screen" style={{ fontFamily: "'Urbanist', sans-serif", background: "#F4F1E8" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
+        .nv-root, .nv-root * { font-family:'Urbanist','Poppins',sans-serif; }
         .wp-editor a { color:#E3A600; }
-        .wp-editor h1 { font-size:26px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor h2 { font-size:22px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor h3 { font-size:18px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor h4 { font-size:16px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor h5 { font-size:14px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor h6 { font-size:13px; font-weight:700; margin:.6em 0 .3em; color:#111827; }
-        .wp-editor p { margin:0 0 1em; line-height:1.7; color:#374151; }
+        .wp-editor h1 { font-size:28px; font-weight:800; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor h2 { font-size:23px; font-weight:700; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor h3 { font-size:19px; font-weight:700; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor h4 { font-size:16px; font-weight:700; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor h5 { font-size:14px; font-weight:700; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor h6 { font-size:13px; font-weight:700; margin:.6em 0 .3em; color:#15302A; }
+        .wp-editor p { margin:0 0 1em; line-height:1.75; color:#3c4a44; }
         .wp-editor ul { list-style:disc; padding-left:1.6em; margin:0 0 1em; }
         .wp-editor ol { list-style:decimal; padding-left:1.6em; margin:0 0 1em; }
-        .wp-editor li { margin:.25em 0; line-height:1.6; color:#374151; }
-        .wp-editor blockquote { border-left:4px solid #E3A600; background:#FFF8E8; padding:10px 14px; margin:0 0 1em; font-style:italic; color:#475569; border-radius:6px; }
+        .wp-editor li { margin:.25em 0; line-height:1.65; color:#3c4a44; }
+        .wp-editor blockquote { border-left:4px solid #E3A600; background:#FBF6E9; padding:10px 14px; margin:0 0 1em; font-style:italic; color:#475569; border-radius:10px; }
         .wp-editor figure { margin:0 0 1em; }
-        .wp-editor figure img { max-width:100%; height:auto; border-radius:10px; display:block; }
+        .wp-editor figure img { max-width:100%; height:auto; border-radius:14px; display:block; }
         .wp-editor figcaption { font-size:12px; color:#64748b; padding:6px 2px; }
         .wp-editor table { border-collapse:collapse; width:100%; margin:0 0 1em; }
-        .wp-editor th, .wp-editor td { border:1px solid #d1d5db; padding:8px 12px; text-align:left; }
-        .wp-editor:empty:before { content:attr(data-placeholder); color:#9ca3af; }
+        .wp-editor th, .wp-editor td { border:1px solid #E6E1D3; padding:8px 12px; text-align:left; }
+        .wp-editor:empty:before { content:attr(data-placeholder); color:#9aa39d; }
         .wp-editor:focus { outline:none; }
-        input[type="file"] { font-size:12px; color:#64748b; border:1.5px dashed #c3c4c7; border-radius:6px; padding:8px 12px; width:100%; background:#fff; cursor:pointer; }
-        .meta-box { background:#fff; border:1px solid #c3c4c7; border-radius:4px; margin-bottom:16px; }
-        .meta-box-head { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #dcdcde; }
-        .meta-box-title { font-size:14px; font-weight:700; color:#1d2327; }
-        .wp-primary { background:#2271b1; color:#fff; border:1px solid #2271b1; padding:7px 14px; border-radius:3px; font-weight:600; font-size:13px; cursor:pointer; transition:background .15s; }
-        .wp-primary:hover:not(:disabled) { background:#135e96; }
-        .wp-primary:disabled { opacity:.6; cursor:not-allowed; }
-        .wp-secondary { background:#f6f7f7; color:#2271b1; border:1px solid #2271b1; padding:6px 12px; border-radius:3px; font-weight:600; font-size:12px; cursor:pointer; }
-        .wp-secondary:hover { background:#f0f6fc; }
-        .wp-link { color:#2271b1; font-size:12px; cursor:pointer; }
-        .wp-link:hover { color:#135e96; text-decoration:underline; }
-        .wp-input { width:100%; padding:7px 10px; font-size:13px; color:#1d2327; border:1px solid #c3c4c7; border-radius:3px; background:#fff; }
-        .wp-input:focus { outline:none; border-color:#2271b1; box-shadow:0 0 0 1px #2271b1; }
-        .row-scroll::-webkit-scrollbar { width:6px; } .row-scroll::-webkit-scrollbar-thumb { background:#c3c4c7; border-radius:4px; }
+        input[type="file"] { font-size:12px; color:#5B6B63; border:1.5px dashed #CBBF9E; border-radius:12px; padding:9px 12px; width:100%; background:#FCFBF6; cursor:pointer; }
+        .meta-box { background:#fff; border:1px solid #ECE6D6; border-radius:18px; margin-bottom:18px; box-shadow:0 1px 2px rgba(21,48,42,.04), 0 6px 18px rgba(21,48,42,.05); overflow:hidden; }
+        .meta-box-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #F0EBDD; }
+        .meta-box-title { font-size:14.5px; font-weight:800; color:#1A614F; letter-spacing:-.01em; }
+        .wp-primary { background:#1A614F; color:#fff; border:none; padding:9px 18px; border-radius:999px; font-weight:700; font-size:13px; cursor:pointer; transition:all .18s; box-shadow:0 2px 8px rgba(26,97,79,.25); }
+        .wp-primary:hover:not(:disabled) { background:#134E3F; transform:translateY(-1px); }
+        .wp-primary:disabled { opacity:.55; cursor:not-allowed; }
+        .wp-secondary { background:#fff; color:#1A614F; border:1.5px solid #1A614F; padding:7px 14px; border-radius:999px; font-weight:700; font-size:12px; cursor:pointer; transition:all .15s; }
+        .wp-secondary:hover { background:#EAF4EF; }
+        .wp-button-primary { background:#1A614F; color:#fff; border:none; padding:7px 16px; border-radius:999px; font-weight:700; font-size:12px; cursor:pointer; transition:background .15s; }
+        .wp-button-primary:hover:not(:disabled) { background:#134E3F; }
+        .wp-link { color:#1A614F; font-size:12px; font-weight:600; cursor:pointer; }
+        .wp-link:hover { color:#E3A600; text-decoration:underline; }
+        .wp-input { width:100%; padding:9px 12px; font-size:13px; color:#1f2a26; border:1px solid #E2DCCB; border-radius:10px; background:#fff; transition:border-color .15s, box-shadow .15s; }
+        .wp-input:focus { outline:none; border-color:#1A614F; box-shadow:0 0 0 3px rgba(26,97,79,.12); }
+        .wp-input::placeholder { color:#aab0a8; }
+        .nv-toolbtn { height:34px; min-width:34px; padding:0 7px; display:flex; align-items:center; justify-content:center; border-radius:9px; color:#2F4A40; border:1px solid transparent; transition:all .12s; }
+        .nv-toolbtn:hover { background:#EAF4EF; }
+        .nv-toolbtn.active { background:#1A614F; color:#fff; }
+        .row-scroll::-webkit-scrollbar { width:6px; } .row-scroll::-webkit-scrollbar-thumb { background:#cfc8b4; border-radius:4px; }
       `}</style>
 
       {/* ── PREVIEW OVERLAY ───────────────────────────────────────────── */}
       {previewMode && (
-        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-white overflow-y-auto nv-root">
           <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-3" style={{ background: "linear-gradient(90deg,#1A614F,#0d3d30)" }}>
             <div className="flex items-center gap-3 text-white">
               <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#E3A600" }} />
@@ -1023,30 +1029,35 @@ function BlogEditor({ editingBlog, onBack }) {
         </div>
       )}
 
-      <div className="flex min-h-screen">
-        {/* ── LEFT NAV (WordPress style) ──────────────────────────────── */}
-        <aside className="w-[160px] shrink-0 flex flex-col text-[#f0f0f1]" style={{ background: "#1d2327" }}>
-          <div className="flex items-center gap-2 px-4 h-12 border-b border-black/30">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "#1A614F" }}><Leaf size={13} className="text-white" /></div>
-            <span className="text-[13px] font-bold tracking-tight">Novara</span>
+      <div className="flex min-h-screen nv-root">
+        {/* ── LEFT NAV (Novara) ──────────────────────────────── */}
+        <aside className="w-[184px] shrink-0 flex flex-col text-[#EAF4EF]" style={{ background: "linear-gradient(180deg,#1A614F 0%,#10463782 60%,#0d3d30 100%)" }}>
+          <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md" style={{ background: "#E3A600" }}><Leaf size={16} className="text-[#15302A]" /></div>
+            <div className="leading-tight">
+              <div className="text-[15px] font-extrabold tracking-tight text-white">Novara</div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#E3A600]">Nature Estates</div>
+            </div>
           </div>
-          <nav className="py-2 flex-1">
+          <nav className="py-3 px-2.5 flex-1 space-y-1">
             {navItems.map(({ id, label, Icon, onClick }) => {
               const active = activeNav === id;
               return (
                 <button key={id} onClick={onClick}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors"
-                  style={active ? { background: "#2271b1", color: "#fff", fontWeight: 600 } : { color: "#c3c4c7" }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#2c3338"; }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] rounded-xl transition-all"
+                  style={active
+                    ? { background: "rgba(255,255,255,0.14)", color: "#fff", fontWeight: 700, boxShadow: "inset 3px 0 0 #E3A600" }
+                    : { color: "#CADFD5" }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
                   onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
                   <Icon size={16} /> {label}
                 </button>
               );
             })}
           </nav>
-          <div className="px-4 py-3 border-t border-black/30">
-            <div className="text-[11px] text-[#a7aaad] truncate mb-1.5">{user?.email}</div>
-            <button onClick={logout} className="flex items-center gap-1.5 text-[12px] text-[#c3c4c7] hover:text-white transition-colors">
+          <div className="px-4 py-4 border-t border-white/10">
+            <div className="text-[11px] text-[#9FC1B5] truncate mb-1.5">{user?.email}</div>
+            <button onClick={logout} className="flex items-center gap-1.5 text-[12px] text-[#CADFD5] hover:text-white transition-colors">
               <LogOut size={12} /> Sign out
             </button>
           </div>
@@ -1055,16 +1066,16 @@ function BlogEditor({ editingBlog, onBack }) {
         {/* ── MAIN ────────────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* top bar */}
-          <div className="h-12 bg-white border-b border-[#c3c4c7] flex items-center justify-between px-5">
-            <div className="flex items-center gap-2.5">
-              <button onClick={onBack} className="w-7 h-7 rounded border border-[#c3c4c7] flex items-center justify-center text-[#50575e] hover:border-[#2271b1] hover:text-[#2271b1]"><ArrowLeft size={14} /></button>
-              <h1 className="text-[16px] font-semibold text-[#1d2327]">{isEditMode ? "Edit Post" : "Add New Post"}</h1>
-              {isEditMode && <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: "#FFF8E8", color: "#b57d00", border: "1px solid #FFCE4C" }}>Editing</span>}
+          <div className="h-16 bg-white border-b border-[#ECE6D6] flex items-center justify-between px-6">
+            <div className="flex items-center gap-3">
+              <button onClick={onBack} className="w-9 h-9 rounded-xl border border-[#E2DCCB] flex items-center justify-center text-[#1A614F] hover:bg-[#EAF4EF] hover:border-[#1A614F] transition-colors"><ArrowLeft size={16} /></button>
+              <h1 className="text-[19px] font-extrabold text-[#15302A] tracking-tight">{isEditMode ? "Edit Post" : "Add New Post"}</h1>
+              {isEditMode && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBF1D2", color: "#9a6b00" }}>Editing</span>}
             </div>
             <button onClick={() => setPreviewMode(true)} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
           </div>
 
-          <div className="flex-1 flex gap-5 px-5 py-5 items-start" style={{ background: "#f0f0f1" }}>
+          <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
             {/* CONTENT COLUMN */}
             <div className="flex-1 min-w-0">
               {/* Title (H1) */}
@@ -1072,19 +1083,19 @@ function BlogEditor({ editingBlog, onBack }) {
                 value={meta.title}
                 onChange={(e) => setMeta((p) => ({ ...p, slug: (p.slug || ""), title: e.target.value }))}
                 placeholder="Add title"
-                className="w-full bg-white border border-[#c3c4c7] rounded-[3px] px-4 py-3 text-[1.7em] font-semibold text-[#1d2327] placeholder:text-[#646970] placeholder:font-normal focus:outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1]"
+                className="w-full bg-white border border-[#ECE6D6] rounded-2xl px-5 py-4 text-[1.7em] font-extrabold text-[#15302A] placeholder:text-[#aab0a8] placeholder:font-semibold focus:outline-none focus:border-[#1A614F] focus:shadow-[0_0_0_3px_rgba(26,97,79,.12)] shadow-sm"
               />
 
               {/* Permalink / slug */}
-              <div className="mt-2 flex items-center flex-wrap gap-2 text-[13px] text-[#50575e]">
+              <div className="mt-2 flex items-center flex-wrap gap-2 text-[13px] text-[#5B6B63]">
                 <span className="font-semibold">Permalink:</span>
-                <span className="text-[#2271b1]">{SITE_BASE}</span>
+                <span className="text-[#1A614F]">{SITE_BASE}</span>
                 <input
                   value={meta.slug}
                   onChange={(e) => setMeta((p) => ({ ...p, slug: e.target.value }))}
                   onBlur={(e) => { if (!e.target.value && meta.title) setMeta((p) => ({ ...p, slug: slugify(meta.title) })); }}
                   placeholder="post-slug"
-                  className="px-2 py-1 rounded border border-[#c3c4c7] bg-[#f6f7f7] text-[#1d2327] focus:outline-none focus:border-[#2271b1] min-w-[160px]"
+                  className="px-2 py-1 rounded border border-[#DDD7C7] bg-[#F4F1E8] text-[#15302A] focus:outline-none focus:border-[#1A614F] min-w-[160px]"
                 />
               </div>
 
@@ -1097,7 +1108,7 @@ function BlogEditor({ editingBlog, onBack }) {
               </div>
 
               {/* Editor box */}
-              <div className="mt-3 bg-white border border-[#c3c4c7] rounded-[3px]">
+              <div className="mt-3 bg-white border border-[#ECE6D6] rounded-2xl shadow-sm overflow-hidden">
                 <Toolbar
                   exec={exec}
                   onLink={onLink} onUnlink={onUnlink} onImage={onImageClick}
@@ -1140,19 +1151,19 @@ function BlogEditor({ editingBlog, onBack }) {
                       const cfg = schemas[def.id];
                       if (!cfg) return null;
                       return (
-                        <div key={def.id} className="border border-[#dcdcde] rounded">
+                        <div key={def.id} className="border border-[#E6E1D3] rounded">
                           {/* Section header: enable + mode */}
-                          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#f6f7f7] border-b border-[#dcdcde]">
+                          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#F4F1E8] border-b border-[#E6E1D3]">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={cfg.enabled}
                                 onChange={(e) => setSchemaCfg(def.id, { enabled: e.target.checked })} />
-                              <span className="text-[13px] font-bold text-[#1d2327]">{def.label}</span>
+                              <span className="text-[13px] font-bold text-[#15302A]">{def.label}</span>
                             </label>
                             {cfg.enabled && (
-                              <div className="flex rounded overflow-hidden border border-[#c3c4c7] text-[11px] font-semibold shrink-0">
+                              <div className="flex rounded overflow-hidden border border-[#DDD7C7] text-[11px] font-semibold shrink-0">
                                 {[["default", "Default"], ["upload", "Upload"]].map(([m, lbl]) => (
                                   <button key={m} type="button" onClick={() => setSchemaCfg(def.id, { mode: m })}
-                                    className={`px-2.5 py-1 ${cfg.mode === m ? "bg-[#2271b1] text-white" : "bg-white text-[#2271b1]"}`}>
+                                    className={`px-2.5 py-1 ${cfg.mode === m ? "bg-[#1A614F] text-white" : "bg-white text-[#1A614F]"}`}>
                                     {lbl}
                                   </button>
                                 ))}
@@ -1204,7 +1215,7 @@ function BlogEditor({ editingBlog, onBack }) {
                                     return (
                                       <React.Fragment key={path}>
                                         <span className="text-[11px] pt-2 leading-tight">
-                                          <span className="font-semibold text-[#1d2327]">{key}</span>
+                                          <span className="font-semibold text-[#15302A]">{key}</span>
                                           {parent && <span className="block text-[10px] text-[#a7aaad]">{parent}</span>}
                                         </span>
                                         {long ? (
@@ -1228,7 +1239,7 @@ function BlogEditor({ editingBlog, onBack }) {
                                     <p className="text-[11px] text-[#1B9A63] font-semibold">✓ Saved — values loaded, edit as needed.</p>
                                   )}
                                   {(cfg.data.items || []).map((it, idx) => (
-                                    <div key={idx} className="border border-[#dcdcde] rounded p-2 space-y-1.5">
+                                    <div key={idx} className="border border-[#E6E1D3] rounded p-2 space-y-1.5">
                                       <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-semibold text-[#787c82]">#{idx + 1}</span>
                                         <button onClick={() => removeSchemaItem(def.id, idx)}
@@ -1263,7 +1274,7 @@ function BlogEditor({ editingBlog, onBack }) {
                         {showJsonLd ? "Hide" : "View"} generated JSON-LD
                       </button>
                       {showJsonLd && (
-                        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[#1d2327] text-[#9be8c0] text-[11px] leading-relaxed p-3 row-scroll whitespace-pre-wrap">{jsonLdPreview || "// Enable a schema to see its JSON-LD"}</pre>
+                        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[#15302A] text-[#9be8c0] text-[11px] leading-relaxed p-3 row-scroll whitespace-pre-wrap">{jsonLdPreview || "// Enable a schema to see its JSON-LD"}</pre>
                       )}
                     </div>
                   </div>
@@ -1283,23 +1294,23 @@ function BlogEditor({ editingBlog, onBack }) {
                   <div className="flex justify-end mb-3">
                     <button onClick={() => setPreviewMode(true)} className="wp-secondary">Preview Changes</button>
                   </div>
-                  <ul className="space-y-2.5 text-[13px] text-[#50575e]">
+                  <ul className="space-y-2.5 text-[13px] text-[#5B6B63]">
                     <li className="flex items-center gap-2">
                       <CircleDot size={14} className="text-[#787c82]" />
-                      Status: <strong className="text-[#1d2327]">Published</strong>
+                      Status: <strong className="text-[#15302A]">Published</strong>
                     </li>
                     <li className="flex items-center gap-2">
                       <Globe size={14} className="text-[#787c82]" />
-                      Visibility: <strong className="text-[#1d2327]">Public</strong>
+                      Visibility: <strong className="text-[#15302A]">Public</strong>
                     </li>
                     <li className="flex items-center gap-2">
                       <Calendar size={14} className="text-[#787c82]" />
                       {editingDate ? (
                         <input autoFocus value={meta.date} onBlur={() => setEditingDate(false)}
                           onChange={(e) => setMeta((p) => ({ ...p, date: e.target.value }))}
-                          className="px-2 py-0.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                          className="px-2 py-0.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
                       ) : (
-                        <span>Published on: <strong className="text-[#1d2327]">{meta.date || "—"}</strong></span>
+                        <span>Published on: <strong className="text-[#15302A]">{meta.date || "—"}</strong></span>
                       )}
                       {!editingDate && <button className="wp-link" onClick={() => setEditingDate(true)}>Edit</button>}
                     </li>
@@ -1312,7 +1323,7 @@ function BlogEditor({ editingBlog, onBack }) {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-3 border-t border-[#dcdcde] flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-[#E6E1D3] flex items-center justify-between">
                     <button onClick={onBack} className="text-[12px] text-[#b32d2e] hover:text-[#8a2424] hover:underline">Move to Trash</button>
                     <button onClick={publishBlog} disabled={publishStatus === "loading"} className="wp-primary flex items-center gap-1.5">
                       {publishStatus === "loading" ? <><Loader size={13} className="animate-spin" /> Updating…</> : <><Send size={13} /> {isEditMode ? "Update" : "Publish"}</>}
@@ -1351,7 +1362,7 @@ function BlogEditor({ editingBlog, onBack }) {
                       <button onClick={() => setMeta((p) => ({ ...p, heroImage: "" }))} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 z-10">×</button>
                     </div>
                   ) : (
-                    <div className="w-full h-28 rounded border border-dashed border-[#c3c4c7] bg-[#f6f7f7] flex flex-col items-center justify-center text-[#a7aaad] gap-1 select-none">
+                    <div className="w-full h-28 rounded border border-dashed border-[#DDD7C7] bg-[#F4F1E8] flex flex-col items-center justify-center text-[#a7aaad] gap-1 select-none">
                       <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
                         <rect x="3" y="3" width="18" height="18" rx="2" />
                         <circle cx="8.5" cy="8.5" r="1.5" />
@@ -1368,29 +1379,29 @@ function BlogEditor({ editingBlog, onBack }) {
 
                   <div className="mt-2 space-y-2">
                     <label className="block">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Alt text <span className="text-[#787c82] font-normal">(SEO)</span></span>
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Alt text <span className="text-[#787c82] font-normal">(SEO)</span></span>
                       <input value={meta.imageAlt} onChange={(e) => setMeta((p) => ({ ...p, imageAlt: e.target.value }))} placeholder="Describe the image for search engines"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
                     </label>
                     <label className="block">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Title</span>
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Title</span>
                       <input value={meta.imageTitle} onChange={(e) => setMeta((p) => ({ ...p, imageTitle: e.target.value }))} placeholder="Image title attribute"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
                     </label>
                     <label className="block">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Caption</span>
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Caption</span>
                       <input value={meta.imageCaption} onChange={(e) => setMeta((p) => ({ ...p, imageCaption: e.target.value }))} placeholder="Shown below the image"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]" />
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
                     </label>
                     <label className="block">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">Description</span>
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Description</span>
                       <textarea rows={2} value={meta.imageDescription} onChange={(e) => setMeta((p) => ({ ...p, imageDescription: e.target.value }))} placeholder="Longer description of the image"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1] resize-none" />
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] resize-none" />
                     </label>
 
                     {/* ── Video / YouTube link ── */}
-                    <div className="pt-1 border-t border-[#f0f0f1]">
-                      <span className="block mb-1 text-[11px] font-semibold text-[#50575e] flex items-center gap-1.5">
+                    <div className="pt-1 border-t border-[#F4F1E8]">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63] flex items-center gap-1.5">
                         <svg viewBox="0 0 24 24" fill="#FF0000" width="13" height="13"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.2 31.2 0 0 0 0 12a31.2 31.2 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.2 31.2 0 0 0 24 12a31.2 31.2 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
                         YouTube video URL
                       </span>
@@ -1398,7 +1409,7 @@ function BlogEditor({ editingBlog, onBack }) {
                         value={meta.videoUrl}
                         onChange={(e) => setMeta((p) => ({ ...p, videoUrl: e.target.value }))}
                         placeholder="https://youtube.com/watch?v=… or youtu.be/…"
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#c3c4c7] focus:outline-none focus:border-[#2271b1]"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
                       />
                       {meta.videoUrl && (() => {
                         const vid = getYouTubeId(meta.videoUrl);
@@ -1409,7 +1420,7 @@ function BlogEditor({ editingBlog, onBack }) {
                               Valid YouTube ID: {vid}
                             </span>
                             <button type="button" onClick={() => setVideoPopupOpen(true)}
-                              className="text-[10px] text-[#2271b1] underline">Preview</button>
+                              className="text-[10px] text-[#1A614F] underline">Preview</button>
                           </div>
                         ) : (
                           <span className="text-[10px] text-[#b32d2e] mt-1 block">⚠ Couldn't detect a YouTube video ID — check the URL.</span>
@@ -1451,7 +1462,7 @@ function BlogEditor({ editingBlog, onBack }) {
                           title="YouTube video preview"
                         />
                       ) : (
-                        <div className="w-full h-full rounded-xl bg-[#1d2327] flex items-center justify-center text-white text-sm">
+                        <div className="w-full h-full rounded-xl bg-[#15302A] flex items-center justify-center text-white text-sm">
                           Invalid YouTube URL — cannot preview.
                         </div>
                       )}
@@ -1495,9 +1506,9 @@ function BlogEditor({ editingBlog, onBack }) {
                     <div className="space-y-1.5 max-h-48 overflow-auto row-scroll">
                       {drafts.length === 0 && <p className="text-[12px] text-[#646970]">No saved drafts.</p>}
                       {drafts.map((d) => (
-                        <div key={d.key} className="flex items-center justify-between gap-2 p-2 border border-[#dcdcde] rounded">
+                        <div key={d.key} className="flex items-center justify-between gap-2 p-2 border border-[#E6E1D3] rounded">
                           <div className="min-w-0">
-                            <div className="text-[12px] font-semibold text-[#1d2327] truncate">{d.data.meta?.title || "Untitled"}</div>
+                            <div className="text-[12px] font-semibold text-[#15302A] truncate">{d.data.meta?.title || "Untitled"}</div>
                             <div className="text-[10px] text-[#646970]">{new Date(d.data.savedAt).toLocaleString()}</div>
                           </div>
                           <div className="flex gap-1 shrink-0">
@@ -1522,7 +1533,7 @@ function BlogEditor({ editingBlog, onBack }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="block mb-1 text-[11px] font-semibold text-[#50575e]">{label}</span>
+      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">{label}</span>
       {children}
     </label>
   );
@@ -1538,7 +1549,7 @@ export default function NovaraBlogBuilder() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f0f0f1" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#F4F1E8" }}>
         <div className="flex flex-col items-center gap-3 text-slate-400">
           <Loader size={28} className="animate-spin" style={{ color: "#1A614F" }} />
           <span className="text-sm">Verifying session…</span>
