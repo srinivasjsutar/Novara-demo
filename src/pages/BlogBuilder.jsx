@@ -772,16 +772,56 @@ function BlogEditor({ editingBlog, onBack }) {
 
   const insertContentImage = () => {
     if (!pendingImageUrl) return;
-    const { alt, caption, videoUrl } = contentImageMeta;
+    const { alt, title, caption, videoUrl } = contentImageMeta;
     const ytId = getYouTubeId(videoUrl);
     if (ytId) imageVideoMapRef.current[pendingImageUrl] = videoUrl;
-    focusBody();
+
+    // Build the figure element directly in the DOM — more reliable than execCommand
+    const figure = document.createElement("figure");
+    if (videoUrl) figure.setAttribute("data-video-url", videoUrl);
+    const img = document.createElement("img");
+    img.src = pendingImageUrl;
+    img.alt = alt || "";
+    if (title) img.title = title;
+    figure.appendChild(img);
+    if (caption) {
+      const figcap = document.createElement("figcaption");
+      figcap.textContent = caption;
+      figure.appendChild(figcap);
+    }
+    const spacer = document.createElement("p");
+    spacer.innerHTML = "<br/>";
+
+    const body = bodyRef.current;
+    if (!body) return;
+
+    // Try to insert at saved caret position; fallback to appending at end
     const sel = window.getSelection();
-    if (savedSelection.current) { sel.removeAllRanges(); sel.addRange(savedSelection.current); }
-    const figCaption = caption ? `<figcaption>${caption}</figcaption>` : "";
-    const videoAttr = videoUrl ? ` data-video-url="${videoUrl}"` : "";
-    const figure = `<figure${videoAttr}><img src="${pendingImageUrl}" alt="${alt}" title="${contentImageMeta.title}" />${figCaption}</figure><p><br/></p>`;
-    document.execCommand("insertHTML", false, figure);
+    let inserted = false;
+    if (savedSelection.current) {
+      try {
+        body.focus();
+        sel.removeAllRanges();
+        sel.addRange(savedSelection.current);
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        // Insert spacer first so caret lands after the figure
+        range.insertNode(spacer);
+        range.insertNode(figure);
+        // Move caret after the spacer
+        const newRange = document.createRange();
+        newRange.setStartAfter(spacer);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        inserted = true;
+      } catch (_) {}
+    }
+    if (!inserted) {
+      body.appendChild(figure);
+      body.appendChild(spacer);
+    }
+
     setPendingImageUrl(null);
     setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
   };
