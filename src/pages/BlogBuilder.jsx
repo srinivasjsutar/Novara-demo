@@ -407,10 +407,7 @@ function BlogPicker({ onSelect }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-slate-800 text-sm truncate group-hover:text-[#1A614F]">{blog.title}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{blog.category}</span>
-                    <span className="text-[11px] text-slate-400 truncate">{blog.slug}</span>
-                  </div>
+                  <div className="text-[11px] text-[#1A614F] font-mono truncate mt-0.5 opacity-70 group-hover:opacity-100">https://www.novaranatureestates.com/blog/{blog.slug}</div>
                 </div>
                 <Edit3 size={14} className="text-slate-300 group-hover:text-[#E3A600] flex-shrink-0" />
               </button>
