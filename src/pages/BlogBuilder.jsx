@@ -5,7 +5,7 @@ import {
   Palette, ChevronDown, Eye, EyeOff, Home, FileText, Image as MediaIcon,
   Leaf, LogIn, LogOut, Loader, AlertCircle, CheckCircle, Send, Search,
   Edit3, ArrowLeft, Plus, Upload, Settings, Calendar, Globe,
-  CircleDot, ChevronsUpDown, Code2,
+  CircleDot, ChevronsUpDown, Code2, ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BLOGS } from "../data/blogs";
@@ -325,9 +325,10 @@ function BlogPicker({ onSelect }) {
   );
 
   const pickerNavItems = [
-    { id: "home",  label: "Home",  Icon: Home,      active: false, onClick: () => onSelect(null) },
-    { id: "blog",  label: "Blogs", Icon: FileText,  active: true,  onClick: () => {} },
-    { id: "media", label: "Media", Icon: MediaIcon, active: false, onClick: () => onSelect(null) },
+    { id: "home",      label: "Home",      Icon: Home,       active: false, onClick: () => onSelect(null) },
+    { id: "blog",      label: "Blogs",     Icon: FileText,   active: true,  onClick: () => {} },
+    { id: "media",     label: "Media",     Icon: MediaIcon,  active: false, onClick: () => onSelect(null) },
+    { id: "redirects", label: "Redirects", Icon: ArrowRight, active: false, onClick: () => onSelect(null) },
   ];
 
   return (
@@ -1089,9 +1090,10 @@ function BlogEditor({ editingBlog, onBack }) {
 
   // ─────────────────────────────────────────────────────────────────────────
   const navItems = [
-    { id: "blog",  label: "Home",  Icon: Home,      onClick: () => setActiveNav("blog") },
-    { id: "home",  label: "Blogs", Icon: FileText,  onClick: onBack },
-    { id: "media", label: "Media", Icon: MediaIcon, onClick: () => { setActiveNav("media"); setShowSettings(true); heroInputRef.current?.focus?.(); } },
+    { id: "blog",      label: "Home",      Icon: Home,       onClick: () => setActiveNav("blog") },
+    { id: "home",      label: "Blogs",     Icon: FileText,   onClick: onBack },
+    { id: "media",     label: "Media",     Icon: MediaIcon,  onClick: () => { setActiveNav("media"); setShowSettings(true); heroInputRef.current?.focus?.(); } },
+    { id: "redirects", label: "Redirects", Icon: ArrowRight, onClick: () => setActiveNav("redirects") },
   ];
 
   return (
@@ -1264,6 +1266,26 @@ function BlogEditor({ editingBlog, onBack }) {
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
             {/* CONTENT COLUMN */}
+            {activeNav === "redirects" ? (
+              <div className="flex-1 min-w-0">
+                <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ArrowRight size={18} className="text-[#1A614F]" />
+                    <h2 className="text-[18px] font-extrabold text-[#15302A]">Redirects</h2>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full ml-1" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{BLOGS.length} blogs</span>
+                  </div>
+                  <p className="text-[13px] text-[#646970] mb-4">Edit any blog redirect slug. Changes commit directly to <code className="bg-[#F4F1E8] px-1.5 py-0.5 rounded text-[12px]">blogs.js</code> and update everywhere instantly.</p>
+                  <RedirectsBox
+                    ghToken={GH_TOKEN}
+                    ghRepo={GH_REPO}
+                    ghBranch={GH_BRANCH}
+                    ghFile={GH_FILE}
+                    fetchCurrentFile={fetchCurrentFile}
+                    inline={true}
+                  />
+                </div>
+              </div>
+            ) : (
             <div className="flex-1 min-w-0">
               {/* Title (H1) */}
               <input
@@ -1576,6 +1598,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 )}
               </div>
             </div>
+            )}
 
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
@@ -1715,14 +1738,6 @@ function BlogEditor({ editingBlog, onBack }) {
                 )}
               </div>
 
-              {/* REDIRECTS BOX */}
-              <RedirectsBox
-                ghToken={GH_TOKEN}
-                ghRepo={GH_REPO}
-                ghBranch={GH_BRANCH}
-                ghFile={GH_FILE}
-                fetchCurrentFile={fetchCurrentFile}
-              />
             </div>
           </div>
         </div>
@@ -1732,171 +1747,126 @@ function BlogEditor({ editingBlog, onBack }) {
 }
 
 // ─── Redirects Box ────────────────────────────────────────────────────
-function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile }) {
+function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inline = false }) {
   const SITE_BLOG_BASE = "https://www.novaranatureestates.com/blog/";
-
-  const [showRedirects, setShowRedirects] = useState(false);
-  const [query, setQuery] = useState("");
-  const [blogs, setBlogs] = useState(() => BLOGS.map((b) => ({ id: b.id, title: b.title, slug: b.slug })));
+  const [query, setQuery]         = useState("");
+  const [blogs, setBlogs]         = useState(() => BLOGS.map((b) => ({ id: b.id, title: b.title, slug: b.slug })));
   const [editingId, setEditingId] = useState(null);
-  const [editSlug, setEditSlug] = useState("");
-  const [savingId, setSavingId] = useState(null);
-  const [savedId, setSavedId] = useState(null);
-  const [errorId, setErrorId] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [copiedId, setCopiedId] = useState(null);
+  const [editSlug, setEditSlug]   = useState("");
+  const [savingId, setSavingId]   = useState(null);
+  const [savedId, setSavedId]     = useState(null);
+  const [errorId, setErrorId]     = useState(null);
+  const [errorMsg, setErrorMsg]   = useState("");
+  const [copiedId, setCopiedId]   = useState(null);
 
   const filtered = blogs.filter((b) =>
     b.title?.toLowerCase().includes(query.toLowerCase()) ||
     b.slug?.toLowerCase().includes(query.toLowerCase())
   );
 
-  const startEdit = (blog) => {
-    setEditingId(blog.id);
-    setEditSlug(blog.slug);
-    setErrorId(null);
-    setErrorMsg("");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditSlug("");
-  };
+  const startEdit = (blog) => { setEditingId(blog.id); setEditSlug(blog.slug); setErrorId(null); setErrorMsg(""); };
+  const cancelEdit = () => { setEditingId(null); setEditSlug(""); };
 
   const saveSlug = async (blog) => {
-    const newSlug = editSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    const newSlug = editSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/, "");
     if (!newSlug || newSlug === blog.slug) { cancelEdit(); return; }
-
-    setSavingId(blog.id);
-    setErrorId(null);
-
+    setSavingId(blog.id); setErrorId(null);
     try {
       const { sha, blogsArray } = await fetchCurrentFile();
       const idx = blogsArray.findIndex((b) => String(b.id) === String(blog.id) || b.slug === blog.slug);
       if (idx === -1) throw new Error("Blog not found in blogs.js");
-
       const updated = [...blogsArray];
       updated[idx] = { ...updated[idx], slug: newSlug };
-
       const entriesStr = updated.map((b) => "  " + JSON.stringify(b, null, 2).replace(/\n/g, "\n  ")).join(",\n");
       const newContent = `export const BLOGS = [\n${entriesStr}\n];\n`;
-
       const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${ghFile}`, {
         method: "PUT",
         headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `update redirect: ${blog.slug} -> ${newSlug}`,
-          content: btoa(unescape(encodeURIComponent(newContent))),
-          sha, branch: ghBranch,
-        }),
+        body: JSON.stringify({ message: `update redirect: ${blog.slug} -> ${newSlug}`, content: btoa(unescape(encodeURIComponent(newContent))), sha, branch: ghBranch }),
       });
-
       if (!putRes.ok) { const err = await putRes.json().catch(() => ({})); throw new Error(err.message || `Commit failed: HTTP ${putRes.status}`); }
-
-      // Update local list everywhere
       setBlogs((prev) => prev.map((b) => String(b.id) === String(blog.id) ? { ...b, slug: newSlug } : b));
-      setSavedId(blog.id);
-      setTimeout(() => setSavedId(null), 2500);
-      setEditingId(null);
-    } catch (e) {
-      setErrorId(blog.id);
-      setErrorMsg(e.message || "Save failed");
-    } finally {
-      setSavingId(null);
-    }
+      setSavedId(blog.id); setTimeout(() => setSavedId(null), 2500); setEditingId(null);
+    } catch (e) { setErrorId(blog.id); setErrorMsg(e.message || "Save failed"); }
+    finally { setSavingId(null); }
   };
 
   const copyLink = (slug) => {
-    navigator.clipboard.writeText(SITE_BLOG_BASE + slug).then(() => {
-      setCopiedId(slug);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
+    navigator.clipboard.writeText(SITE_BLOG_BASE + slug).then(() => { setCopiedId(slug); setTimeout(() => setCopiedId(null), 2000); });
   };
+
+  const listContent = (
+    <div className={`space-y-2 ${inline ? "" : "p-3"}`}>
+      {!inline && <p className="text-[11px] text-[#646970] leading-relaxed">Edit any blog’s redirect slug. Changes save to <code className="bg-[#F4F1E8] px-1 rounded">blogs.js</code> immediately.</p>}
+      <div className="relative">
+        <Search size={inline ? 13 : 11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search blogs…"
+          className={`w-full pl-7 pr-2.5 py-1.5 rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white ${inline ? "text-[13px]" : "text-[11px]"}`} />
+      </div>
+      <div className={`space-y-2 overflow-auto row-scroll ${inline ? "max-h-[60vh]" : "max-h-64"}`}>
+        {filtered.map((blog) => {
+          const isEditing = editingId === blog.id;
+          const isSaving  = savingId === blog.id;
+          const isSaved   = savedId === blog.id;
+          const isError   = errorId === blog.id;
+          return (
+            <div key={blog.id} className="rounded-lg border border-[#E6E1D3] bg-white overflow-hidden">
+              <div className={`flex items-center justify-between gap-1 ${inline ? "px-3 pt-2.5 pb-1" : "px-2.5 pt-2 pb-1"}`}>
+                <span className={`font-semibold text-[#15302A] truncate leading-snug flex-1 ${inline ? "text-[13px]" : "text-[11px]"}`}>{blog.title}</span>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => copyLink(blog.slug)} title="Copy URL"
+                    className={`rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors ${inline ? "w-6 h-6" : "w-5 h-5"}`}>
+                    {copiedId === blog.slug ? <CheckCircle size={inline ? 13 : 11} className="text-[#1B9A63]" /> : <LinkIcon size={inline ? 13 : 11} />}
+                  </button>
+                  {!isEditing ? (
+                    <button onClick={() => startEdit(blog)} title="Edit slug"
+                      className={`rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors ${inline ? "w-6 h-6" : "w-5 h-5"}`}>
+                      <Edit3 size={inline ? 13 : 11} />
+                    </button>
+                  ) : (
+                    <button onClick={cancelEdit} title="Cancel"
+                      className={`rounded flex items-center justify-center text-[#b32d2e] hover:bg-red-50 transition-colors font-bold ${inline ? "w-6 h-6 text-[13px]" : "w-5 h-5 text-[11px]"}`}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className={inline ? "px-3 pb-3" : "px-2.5 pb-2"}>
+                {!isEditing ? (
+                  <div className={`text-[#1A614F] font-mono truncate ${inline ? "text-[12px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}<span className="font-bold">{blog.slug}</span></div>
+                ) : (
+                  <div className="space-y-1.5 mt-1">
+                    <div className={`text-slate-400 font-mono truncate ${inline ? "text-[11px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}</div>
+                    <input autoFocus value={editSlug} onChange={(e) => setEditSlug(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveSlug(blog); if (e.key === "Escape") cancelEdit(); }}
+                      className={`w-full px-2 py-1 font-mono rounded border border-[#1A614F] focus:outline-none focus:ring-1 focus:ring-[#1A614F]/30 text-[#15302A] ${inline ? "text-[13px]" : "text-[11px]"}`}
+                      placeholder="new-slug-here" />
+                    <button onClick={() => saveSlug(blog)} disabled={isSaving}
+                      className={`w-full flex items-center justify-center gap-1 py-1.5 rounded font-bold text-white transition-all disabled:opacity-60 ${inline ? "text-[13px]" : "text-[11px]"}`}
+                      style={{ background: "linear-gradient(135deg,#1A614F,#0d3d30)" }}>
+                      {isSaving ? <><Loader size={inline ? 13 : 11} className="animate-spin" /> Saving…</> : <><Send size={inline ? 13 : 11} /> Save redirect</>}
+                    </button>
+                  </div>
+                )}
+                {isSaved && <div className={`mt-1 flex items-center gap-1 text-[#1B9A63] font-semibold ${inline ? "text-[12px]" : "text-[10px]"}`}><CheckCircle size={inline ? 12 : 10} /> Saved!</div>}
+                {isError && <div className={`mt-1 text-red-600 font-semibold ${inline ? "text-[12px]" : "text-[10px]"}`}>{errorMsg}</div>}
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && <p className={`text-[#646970] text-center py-3 ${inline ? "text-[13px]" : "text-[11px]"}`}>No blogs match “{query}”</p>}
+      </div>
+    </div>
+  );
+
+  if (inline) return listContent;
 
   return (
     <div className="meta-box">
-      <button className="meta-box-head w-full" onClick={() => setShowRedirects((v) => !v)}>
-        <span className="meta-box-title flex items-center gap-1.5">
-          <LinkIcon size={13} /> Redirects
-        </span>
-        <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showRedirects ? "rotate-180" : ""}`} />
+      <button className="meta-box-head w-full" onClick={() => {}}>
+        <span className="meta-box-title flex items-center gap-1.5"><LinkIcon size={13} /> Redirects</span>
       </button>
-      {showRedirects && (
-        <div className="p-3 space-y-2">
-          <p className="text-[11px] text-[#646970] leading-relaxed">Edit any blog’s redirect slug. Changes save to <code className="bg-[#F4F1E8] px-1 rounded">blogs.js</code> immediately.</p>
-
-          {/* Search */}
-          <div className="relative">
-            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search blogs…"
-              className="w-full pl-7 pr-2.5 py-1.5 text-[11px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white" />
-          </div>
-
-          {/* List */}
-          <div className="space-y-1.5 max-h-64 overflow-auto row-scroll">
-            {filtered.map((blog) => {
-              const isEditing = editingId === blog.id;
-              const isSaving = savingId === blog.id;
-              const isSaved  = savedId === blog.id;
-              const isError  = errorId === blog.id;
-              return (
-                <div key={blog.id} className="rounded-lg border border-[#E6E1D3] bg-white overflow-hidden">
-                  {/* Title row */}
-                  <div className="px-2.5 pt-2 pb-1 flex items-center justify-between gap-1">
-                    <span className="text-[11px] font-semibold text-[#15302A] truncate leading-snug flex-1">{blog.title}</span>
-                    <div className="flex gap-1 shrink-0">
-                      {/* Copy */}
-                      <button onClick={() => copyLink(blog.slug)} title="Copy URL"
-                        className="w-5 h-5 rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
-                        {copiedId === blog.slug ? <CheckCircle size={11} className="text-[#1B9A63]" /> : <LinkIcon size={11} />}
-                      </button>
-                      {/* Edit / Cancel */}
-                      {!isEditing ? (
-                        <button onClick={() => startEdit(blog)} title="Edit slug"
-                          className="w-5 h-5 rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
-                          <Edit3 size={11} />
-                        </button>
-                      ) : (
-                        <button onClick={cancelEdit} title="Cancel"
-                          className="w-5 h-5 rounded flex items-center justify-center text-[#b32d2e] hover:bg-red-50 transition-colors text-[11px] font-bold">
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Slug row */}
-                  <div className="px-2.5 pb-2">
-                    {!isEditing ? (
-                      <div className="text-[10px] text-[#1A614F] font-mono truncate">{SITE_BLOG_BASE}<span className="font-bold">{blog.slug}</span></div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono truncate">{SITE_BLOG_BASE}</div>
-                        <input
-                          autoFocus
-                          value={editSlug}
-                          onChange={(e) => setEditSlug(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") saveSlug(blog); if (e.key === "Escape") cancelEdit(); }}
-                          className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#1A614F] focus:outline-none focus:ring-1 focus:ring-[#1A614F]/30 text-[#15302A]"
-                          placeholder="new-slug-here"
-                        />
-                        <button onClick={() => saveSlug(blog)} disabled={isSaving}
-                          className="w-full flex items-center justify-center gap-1 py-1 rounded text-[11px] font-bold text-white transition-all disabled:opacity-60"
-                          style={{ background: "linear-gradient(135deg,#1A614F,#0d3d30)" }}>
-                          {isSaving ? <><Loader size={11} className="animate-spin" /> Saving…</> : <><Send size={11} /> Save redirect</>}
-                        </button>
-                      </div>
-                    )}
-                    {isSaved && <div className="mt-1 flex items-center gap-1 text-[10px] text-[#1B9A63] font-semibold"><CheckCircle size={10} /> Saved!</div>}
-                    {isError && <div className="mt-1 text-[10px] text-red-600 font-semibold">{errorMsg}</div>}
-                  </div>
-                </div>
-              );
-            })}
-            {filtered.length === 0 && <p className="text-[11px] text-[#646970] text-center py-3">No blogs match “{query}”</p>}
-          </div>
-        </div>
-      )}
+      {listContent}
     </div>
   );
 }
