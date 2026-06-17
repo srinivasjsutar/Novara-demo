@@ -1748,7 +1748,7 @@ function BlogEditor({ editingBlog, onBack }) {
 function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inline = false }) {
   const SITE_BLOG_BASE = "https://www.novaranatureestates.com/blog/";
   const [query, setQuery]         = useState("");
-  const [blogs, setBlogs]         = useState(() => BLOGS.map((b) => ({ id: b.id, title: b.title, slug: b.slug })));
+  const [blogs, setBlogs]         = useState(() => BLOGS.map((b) => ({ id: b.id, title: b.title, headline: b.headline, slug: b.slug })));
   const [editingId, setEditingId] = useState(null);
   const [editSlug, setEditSlug]   = useState("");
   const [savingId, setSavingId]   = useState(null);
@@ -1758,6 +1758,7 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inl
   const [copiedId, setCopiedId]   = useState(null);
 
   const filtered = blogs.filter((b) =>
+    b.headline?.toLowerCase().includes(query.toLowerCase()) ||
     b.title?.toLowerCase().includes(query.toLowerCase()) ||
     b.slug?.toLowerCase().includes(query.toLowerCase())
   );
@@ -1810,7 +1811,7 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inl
           return (
             <div key={blog.id} className="rounded-lg border border-[#E6E1D3] bg-white overflow-hidden">
               <div className={`flex items-center justify-between gap-1 ${inline ? "px-3 pt-2.5 pb-1" : "px-2.5 pt-2 pb-1"}`}>
-                <span className={`font-semibold text-[#15302A] truncate leading-snug flex-1 ${inline ? "text-[13px]" : "text-[11px]"}`}>{blog.title}</span>
+                <span className={`font-semibold text-[#15302A] leading-snug flex-1 ${inline ? "text-[13px]" : "text-[11px]"}`} style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{blog.headline || blog.title}</span>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => copyLink(blog.slug)} title="Copy URL"
                     className={`rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors ${inline ? "w-6 h-6" : "w-5 h-5"}`}>
@@ -1831,7 +1832,7 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inl
               </div>
               <div className={inline ? "px-3 pb-3" : "px-2.5 pb-2"}>
                 {!isEditing ? (
-                  <div className={`text-[#1A614F] font-mono truncate ${inline ? "text-[12px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}<span className="font-bold">{blog.slug}</span></div>
+                  <div className={`text-[#1A614F] font-mono truncate ${inline ? "text-[12px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}{blog.slug}</div>
                 ) : (
                   <div className="space-y-1.5 mt-1">
                     <div className={`text-slate-400 font-mono truncate ${inline ? "text-[11px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}</div>
