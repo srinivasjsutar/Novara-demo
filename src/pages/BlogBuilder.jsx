@@ -533,6 +533,8 @@ function BlogEditor({ editingBlog, onBack }) {
   const [showJsonLd, setShowJsonLd] = useState(false);
   const [schemas, setSchemas] = useState(() => initSchemas());
   const [imageVideoPopup, setImageVideoPopup] = useState(null); // { videoUrl } for content image lightbox
+  const [pendingImageUrl, setPendingImageUrl] = useState(null); // url of just-uploaded content image awaiting meta
+  const [contentImageMeta, setContentImageMeta] = useState({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishMsg, setPublishMsg] = useState("");
@@ -761,18 +763,32 @@ function BlogEditor({ editingBlog, onBack }) {
     setImageUploading(true);
     try {
       const url = await compressAndUpload(file, { maxW: 1200, quality: 0.8 });
-      // Ask for optional YouTube URL for this image
-      const ytUrl = window.prompt("YouTube video URL for this image (optional — leave blank to skip):", "") || "";
-      const ytId = getYouTubeId(ytUrl);
-      // Store the mapping so it survives contentEditable sanitization
-      if (ytId) imageVideoMapRef.current[url] = ytUrl;
-      focusBody();
-      const sel = window.getSelection();
-      if (savedSelection.current) { sel.removeAllRanges(); sel.addRange(savedSelection.current); }
-      const figure = `<figure><img src="${url}" alt="" /><figcaption>Add a caption…</figcaption></figure><p><br/></p>`;
-      document.execCommand("insertHTML", false, figure);
+      // Show meta panel instead of window.prompt
+      setPendingImageUrl(url);
+      setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
     } catch (e) { alert("Image upload failed: " + e.message); }
     finally { setImageUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
+  };
+
+  const insertContentImage = () => {
+    if (!pendingImageUrl) return;
+    const { alt, caption, videoUrl } = contentImageMeta;
+    const ytId = getYouTubeId(videoUrl);
+    if (ytId) imageVideoMapRef.current[pendingImageUrl] = videoUrl;
+    focusBody();
+    const sel = window.getSelection();
+    if (savedSelection.current) { sel.removeAllRanges(); sel.addRange(savedSelection.current); }
+    const figCaption = caption ? `<figcaption>${caption}</figcaption>` : "";
+    const videoAttr = videoUrl ? ` data-video-url="${videoUrl}"` : "";
+    const figure = `<figure${videoAttr}><img src="${pendingImageUrl}" alt="${alt}" title="${contentImageMeta.title}" />${figCaption}</figure><p><br/></p>`;
+    document.execCommand("insertHTML", false, figure);
+    setPendingImageUrl(null);
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+  };
+
+  const cancelContentImage = () => {
+    setPendingImageUrl(null);
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
   };
 
   const handleHeroImage = async (file) => {
@@ -1244,6 +1260,93 @@ function BlogEditor({ editingBlog, onBack }) {
 
               {/* hidden file inputs */}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleContentImage(e.target.files[0])} />
+
+              {/* CONTENT IMAGE META PANEL */}
+              {pendingImageUrl && (
+                <div className="meta-box mt-4">
+                  <div className="meta-box-head">
+                    <span className="meta-box-title flex items-center gap-1.5"><ImageIcon size={13} /> Image details</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* Preview */}
+                    <div className="relative rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8]">
+                      <img src={pendingImageUrl} alt="preview" className="w-full max-h-48 object-cover" />
+                    </div>
+
+                    {/* YouTube video URL */}
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">YouTube video URL <span className="text-[#787c82] font-normal">(optional — adds play button overlay)</span></span>
+                      <input
+                        value={contentImageMeta.videoUrl}
+                        onChange={(e) => setContentImageMeta((p) => ({ ...p, videoUrl: e.target.value }))}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                      />
+                      {contentImageMeta.videoUrl && getYouTubeId(contentImageMeta.videoUrl) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] text-[#1B9A63] font-semibold">
+                          <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg>
+                          Valid YouTube URL detected
+                        </span>
+                      )}
+                    </label>
+
+                    {/* Alt text */}
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Alt text <span className="text-[#787c82] font-normal">(SEO)</span></span>
+                      <input
+                        value={contentImageMeta.alt}
+                        onChange={(e) => setContentImageMeta((p) => ({ ...p, alt: e.target.value }))}
+                        placeholder="Describe the image for search engines"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                      />
+                    </label>
+
+                    {/* Title */}
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Title</span>
+                      <input
+                        value={contentImageMeta.title}
+                        onChange={(e) => setContentImageMeta((p) => ({ ...p, title: e.target.value }))}
+                        placeholder="Image title attribute"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                      />
+                    </label>
+
+                    {/* Caption */}
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Caption</span>
+                      <input
+                        value={contentImageMeta.caption}
+                        onChange={(e) => setContentImageMeta((p) => ({ ...p, caption: e.target.value }))}
+                        placeholder="Shown below the image"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                      />
+                    </label>
+
+                    {/* Description */}
+                    <label className="block">
+                      <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Description</span>
+                      <textarea
+                        rows={2}
+                        value={contentImageMeta.description}
+                        onChange={(e) => setContentImageMeta((p) => ({ ...p, description: e.target.value }))}
+                        placeholder="Longer description of the image"
+                        className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] resize-none"
+                      />
+                    </label>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={insertContentImage} className="wp-primary flex items-center gap-1.5">
+                        <ImageIcon size={13} /> Insert into post
+                      </button>
+                      <button onClick={cancelContentImage} className="wp-secondary">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* POST SETTINGS / SEO BOX */}
               <div className="meta-box mt-5">
