@@ -1063,18 +1063,21 @@ function BlogEditor({ editingBlog, onBack }) {
   };
 
   // ── Preview sections ──────────────────────────────────────────────────────
-  const previewSections = useMemo(() => {
-    if (!previewMode) return [];
-    // Use bodySnapshot (state) so React-inserted DOM changes are captured reliably
-    const html = bodySnapshot || (bodyRef.current ? bodyRef.current.innerHTML : "");
+  // Always keep sections computed — preview reads them the moment it opens
+  const computeSections = useCallback(() => {
+    const html = (bodyRef.current ? bodyRef.current.innerHTML : "") || bodySnapshot;
     const sections = htmlToSections(html);
-    // Attach stored YouTube URLs to image sections
     return sections.map((s) =>
       s.type === "image" && s.src && imageVideoMapRef.current[s.src]
         ? { ...s, videoUrl: imageVideoMapRef.current[s.src] }
         : s
     );
-  }, [previewMode, bodySnapshot]);
+  }, [bodySnapshot]);
+
+  const previewSections = useMemo(() => {
+    if (!previewMode) return [];
+    return computeSections();
+  }, [previewMode, computeSections]);
 
   // ─────────────────────────────────────────────────────────────────────────
   const navItems = [
@@ -1248,7 +1251,7 @@ function BlogEditor({ editingBlog, onBack }) {
               <h1 className="text-[19px] font-extrabold text-[#15302A] tracking-tight">{isEditMode ? "Edit Post" : "Add New Post"}</h1>
               {isEditMode && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBF1D2", color: "#9a6b00" }}>Editing</span>}
             </div>
-            <button onClick={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); setPreviewMode(true); }} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
+            <button onClick={() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
           </div>
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
@@ -1576,7 +1579,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 </div>
                 <div className="p-3">
                   <div className="flex justify-end mb-3">
-                    <button onClick={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); setPreviewMode(true); }} className="wp-secondary">Preview Changes</button>
+                    <button onClick={() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }} className="wp-secondary">Preview Changes</button>
                   </div>
                   <ul className="space-y-2.5 text-[13px] text-[#5B6B63]">
                     <li className="flex items-center gap-2">
