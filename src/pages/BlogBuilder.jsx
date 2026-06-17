@@ -825,10 +825,8 @@ function BlogEditor({ editingBlog, onBack }) {
 
     setPendingImageUrl(null);
     setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
-    // Snapshot body so preview can read it reliably
-    setTimeout(() => {
-      if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
-    }, 0);
+    // Snapshot immediately — direct DOM read is synchronous
+    if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
   };
 
   const cancelContentImage = () => {
@@ -1251,7 +1249,7 @@ function BlogEditor({ editingBlog, onBack }) {
               <h1 className="text-[19px] font-extrabold text-[#15302A] tracking-tight">{isEditMode ? "Edit Post" : "Add New Post"}</h1>
               {isEditMode && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBF1D2", color: "#9a6b00" }}>Editing</span>}
             </div>
-            <button onClick={() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
+            <button onClick={() => { if (pendingImageUrl) insertContentImage(); setTimeout(() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }, 20); }} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
           </div>
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
@@ -1579,7 +1577,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 </div>
                 <div className="p-3">
                   <div className="flex justify-end mb-3">
-                    <button onClick={() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }} className="wp-secondary">Preview Changes</button>
+                    <button onClick={() => { if (pendingImageUrl) insertContentImage(); setTimeout(() => { const html = bodyRef.current ? bodyRef.current.innerHTML : ""; setBodySnapshot(html); setPreviewMode(true); }, 20); }} className="wp-secondary">Preview Changes</button>
                   </div>
                   <ul className="space-y-2.5 text-[13px] text-[#5B6B63]">
                     <li className="flex items-center gap-2">
