@@ -162,10 +162,13 @@ const htmlToSections = (html = "") => {
       return;
     }
     if (tag === "figure" || tag === "img" || (img && !hasRealText(node))) {
-      const src = (tag === "img" ? node.getAttribute("src") : img?.getAttribute("src")) || "";
+      const imgEl = tag === "img" ? node : img;
+      const src = imgEl?.getAttribute("src") || "";
+      const alt = imgEl?.getAttribute("alt") || "";
+      const title = imgEl?.getAttribute("title") || "";
       const cap = node.querySelector ? (node.querySelector("figcaption")?.textContent.trim() || "") : "";
       const videoUrl = (tag === "figure" ? node.getAttribute("data-video-url") : null) || "";
-      if (src) out.push({ type: "image", src, caption: cap, videoUrl });
+      if (src) out.push({ type: "image", src, alt, title, caption: cap, videoUrl });
       return;
     }
     if (tag === "table") {
@@ -208,7 +211,12 @@ function PreviewSection({ s, usedH3, onPlayVideo }) {
       <figure className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 relative group">
         {s.src ? (
           <div className="relative">
-            <img src={s.src} alt={s.caption || ""} className="w-full h-auto" />
+            <img
+              src={s.src}
+              alt={s.alt || s.caption || ""}
+              title={s.title || undefined}
+              className="w-full h-auto"
+            />
             {s.videoUrl && getYouTubeId(s.videoUrl) && (
               <button
                 type="button"
@@ -1065,11 +1073,13 @@ function BlogEditor({ editingBlog, onBack }) {
   const computeSections = useCallback(() => {
     const html = (bodyRef.current ? bodyRef.current.innerHTML : "") || bodySnapshot;
     const sections = htmlToSections(html);
-    return sections.map((s) =>
-      s.type === "image" && s.src && imageVideoMapRef.current[s.src]
-        ? { ...s, videoUrl: imageVideoMapRef.current[s.src] }
-        : s
-    );
+    return sections.map((s) => {
+      if (s.type === "image" && s.src) {
+        const storedVideo = imageVideoMapRef.current[s.src];
+        return storedVideo ? { ...s, videoUrl: storedVideo } : s;
+      }
+      return s;
+    });
   }, [bodySnapshot]);
 
   const previewSections = useMemo(() => {
