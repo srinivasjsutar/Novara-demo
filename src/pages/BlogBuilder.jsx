@@ -316,67 +316,98 @@ function BlogPicker({ onSelect }) {
     b.category?.toLowerCase().includes(query.toLowerCase()),
   );
 
+  const pickerNavItems = [
+    { id: "home",  label: "Home",  Icon: Home,      active: false, onClick: () => onSelect(null) },
+    { id: "blog",  label: "Blogs", Icon: FileText,  active: true,  onClick: () => {} },
+    { id: "media", label: "Media", Icon: MediaIcon, active: false, onClick: () => onSelect(null) },
+  ];
+
   return (
-    <div className="min-h-screen" style={{ fontFamily: "'Urbanist', sans-serif", background: "#F4F1E8" }}>
+    <div className="min-h-screen flex" style={{ fontFamily: "'Urbanist', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap');`}</style>
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#1A614F" }}><Leaf size={15} className="text-white" /></div>
-          <div>
-            <span className="text-[15px] font-bold text-slate-800 leading-none block">Blog Builder</span>
-            <span className="text-[10px] text-slate-400">Novara Nature Estates</span>
+
+      {/* ── LEFT SIDEBAR ── */}
+      <aside className="w-[184px] shrink-0 flex flex-col text-[#EAF4EF]" style={{ background: "linear-gradient(180deg,#1A614F 0%,#10463782 60%,#0d3d30 100%)" }}>
+        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md" style={{ background: "#E3A600" }}><Leaf size={16} className="text-[#15302A]" /></div>
+          <div className="leading-tight">
+            <div className="text-[15px] font-extrabold tracking-tight text-white">Novara</div>
+            <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#E3A600]">Nature Estates</div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: "#E9FFF3", color: "#1B9A63" }}>
-            <div className="w-1.5 h-1.5 rounded-full bg-[#1B9A63]" />{user?.email || "Logged in"}
-          </div>
-          <button onClick={logout} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-semibold hover:border-red-300 hover:text-red-500 transition-all">
+        <nav className="py-3 px-2.5 flex-1 space-y-1">
+          {pickerNavItems.map(({ id, label, Icon, active, onClick }) => (
+            <button key={id} onClick={onClick}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] rounded-xl transition-all"
+              style={active
+                ? { background: "rgba(255,255,255,0.14)", color: "#fff", fontWeight: 700, boxShadow: "inset 3px 0 0 #E3A600" }
+                : { color: "#CADFD5" }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-white/10">
+          <div className="text-[11px] text-[#9FC1B5] truncate mb-1.5">{user?.email}</div>
+          <button onClick={logout} className="flex items-center gap-1.5 text-[12px] text-[#CADFD5] hover:text-white transition-colors">
             <LogOut size={12} /> Sign out
           </button>
         </div>
-      </div>
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold text-[#111827] mb-2">What would you like to do?</h2>
-        <p className="text-sm text-slate-500 mb-8">Create a new blog post, or open an existing one to edit.</p>
-        <button onClick={() => onSelect(null)}
-          className="w-full mb-8 flex items-center gap-4 p-5 rounded-2xl border-2 border-dashed border-[#1A614F]/30 bg-[#F0FDF4] hover:border-[#1A614F] hover:bg-[#E9FFF3] transition-all group text-left">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform" style={{ background: "linear-gradient(135deg,#1A614F,#0d3d30)" }}>
-            <Plus size={22} className="text-white" />
-          </div>
-          <div>
-            <div className="font-bold text-[#1A614F] text-base">Create new blog</div>
-            <div className="text-sm text-slate-500 mt-0.5">Start fresh with a blank post</div>
-          </div>
-        </button>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Edit existing ({BLOGS.length} blogs)</h3>
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search blogs…"
-              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1A614F] w-44" />
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 min-w-0 flex flex-col" style={{ background: "#F4F1E8" }}>
+        {/* top bar */}
+        <div className="h-16 bg-white border-b border-[#ECE6D6] flex items-center justify-between px-6 shadow-sm">
+          <h1 className="text-[19px] font-extrabold text-[#15302A] tracking-tight">Blog Builder</h1>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: "#E9FFF3", color: "#1B9A63" }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#1B9A63]" />{user?.email || "Logged in"}
           </div>
         </div>
-        <div className="space-y-2">
-          {filtered.map((blog) => (
-            <button key={blog.id} onClick={() => onSelect(blog)}
-              className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-[#E3A600] hover:shadow-md transition-all group text-left">
-              <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
-                {blog.heroImage || blog.image
-                  ? <img src={blog.heroImage || blog.image} alt={blog.title} className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-slate-300" /></div>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-slate-800 text-sm truncate group-hover:text-[#1A614F]">{blog.title}</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{blog.category}</span>
-                  <span className="text-[11px] text-slate-400 truncate">{blog.slug}</span>
+
+        <div className="max-w-4xl mx-auto w-full px-6 py-10">
+          <h2 className="text-2xl font-bold text-[#111827] mb-2">What would you like to do?</h2>
+          <p className="text-sm text-slate-500 mb-8">Create a new blog post, or open an existing one to edit.</p>
+          <button onClick={() => onSelect(null)}
+            className="w-full mb-8 flex items-center gap-4 p-5 rounded-2xl border-2 border-dashed border-[#1A614F]/30 bg-[#F0FDF4] hover:border-[#1A614F] hover:bg-[#E9FFF3] transition-all group text-left">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform" style={{ background: "linear-gradient(135deg,#1A614F,#0d3d30)" }}>
+              <Plus size={22} className="text-white" />
+            </div>
+            <div>
+              <div className="font-bold text-[#1A614F] text-base">Create new blog</div>
+              <div className="text-sm text-slate-500 mt-0.5">Start fresh with a blank post</div>
+            </div>
+          </button>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Edit existing ({BLOGS.length} blogs)</h3>
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search blogs…"
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1A614F] w-44" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {filtered.map((blog) => (
+              <button key={blog.id} onClick={() => onSelect(blog)}
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-[#E3A600] hover:shadow-md transition-all group text-left">
+                <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
+                  {blog.heroImage || blog.image
+                    ? <img src={blog.heroImage || blog.image} alt={blog.title} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-slate-300" /></div>}
                 </div>
-              </div>
-              <Edit3 size={14} className="text-slate-300 group-hover:text-[#E3A600] flex-shrink-0" />
-            </button>
-          ))}
-          {filtered.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No blogs match “{query}”</div>}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-slate-800 text-sm truncate group-hover:text-[#1A614F]">{blog.title}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{blog.category}</span>
+                    <span className="text-[11px] text-slate-400 truncate">{blog.slug}</span>
+                  </div>
+                </div>
+                <Edit3 size={14} className="text-slate-300 group-hover:text-[#E3A600] flex-shrink-0" />
+              </button>
+            ))}
+            {filtered.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No blogs match "{query}"</div>}
+          </div>
         </div>
       </div>
     </div>
@@ -985,8 +1016,8 @@ function BlogEditor({ editingBlog, onBack }) {
 
   // ─────────────────────────────────────────────────────────────────────────
   const navItems = [
-    { id: "home",  label: "Home",  Icon: Home,      onClick: onBack },
-    { id: "blog",  label: "Blog",  Icon: FileText,  onClick: () => setActiveNav("blog") },
+    { id: "blog",  label: "Home",  Icon: Home,      onClick: () => setActiveNav("blog") },
+    { id: "home",  label: "Blogs", Icon: FileText,  onClick: onBack },
     { id: "media", label: "Media", Icon: MediaIcon, onClick: () => { setActiveNav("media"); setShowSettings(true); heroInputRef.current?.focus?.(); } },
   ];
 
@@ -1213,6 +1244,26 @@ function BlogEditor({ editingBlog, onBack }) {
 
               {/* hidden file inputs */}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleContentImage(e.target.files[0])} />
+
+              {/* POST SETTINGS / SEO BOX */}
+              <div className="meta-box mt-5">
+                <button className="meta-box-head w-full" onClick={() => setShowSettings((v) => !v)}>
+                  <span className="meta-box-title flex items-center gap-1.5"><Settings size={13} /> Post settings &amp; SEO</span>
+                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSettings ? "rotate-180" : ""}`} />
+                </button>
+                {showSettings && (
+                  <div className="p-3 space-y-3">
+                    <Field label="Meta title (<title>)"><input value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" /></Field>
+                    <Field label="Meta description"><textarea rows={3} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" /></Field>
+                    <Field label="Focus keyword(s)"><input value={meta.keywords} onChange={(e) => setMeta((p) => ({ ...p, keywords: e.target.value }))} placeholder="farmland near bangalore" className="wp-input" /></Field>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Category"><input value={meta.category} onChange={(e) => setMeta((p) => ({ ...p, category: e.target.value }))} className="wp-input" /></Field>
+                      <Field label="Author"><input value={meta.author} onChange={(e) => setMeta((p) => ({ ...p, author: e.target.value }))} className="wp-input" /></Field>
+                    </div>
+                    <Field label="Tags (comma-separated)"><input value={meta.tags} onChange={(e) => setMeta((p) => ({ ...p, tags: e.target.value }))} placeholder="Organic, Eco" className="wp-input" /></Field>
+                  </div>
+                )}
+              </div>
 
               {/* SCHEMAS CONTAINER */}
               <div className="meta-box mt-5">
@@ -1470,26 +1521,6 @@ function BlogEditor({ editingBlog, onBack }) {
                     </label>
                   </div>
                 </div>
-              </div>
-
-              {/* POST SETTINGS / SEO BOX */}
-              <div className="meta-box">
-                <button className="meta-box-head w-full" onClick={() => setShowSettings((v) => !v)}>
-                  <span className="meta-box-title flex items-center gap-1.5"><Settings size={13} /> Post settings &amp; SEO</span>
-                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showSettings ? "rotate-180" : ""}`} />
-                </button>
-                {showSettings && (
-                  <div className="p-3 space-y-3">
-                    <Field label="Meta title (<title>)"><input value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" /></Field>
-                    <Field label="Meta description"><textarea rows={3} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" /></Field>
-                    <Field label="Focus keyword(s)"><input value={meta.keywords} onChange={(e) => setMeta((p) => ({ ...p, keywords: e.target.value }))} placeholder="farmland near bangalore" className="wp-input" /></Field>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field label="Category"><input value={meta.category} onChange={(e) => setMeta((p) => ({ ...p, category: e.target.value }))} className="wp-input" /></Field>
-                      <Field label="Author"><input value={meta.author} onChange={(e) => setMeta((p) => ({ ...p, author: e.target.value }))} className="wp-input" /></Field>
-                    </div>
-                    <Field label="Tags (comma-separated)"><input value={meta.tags} onChange={(e) => setMeta((p) => ({ ...p, tags: e.target.value }))} placeholder="Organic, Eco" className="wp-input" /></Field>
-                  </div>
-                )}
               </div>
 
               {/* DRAFTS BOX */}
