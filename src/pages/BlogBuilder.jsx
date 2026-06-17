@@ -1577,6 +1577,9 @@ function BlogEditor({ editingBlog, onBack }) {
               </div>
             </div>
 
+            {/* REDIRECTS SECTION */}
+            <RedirectsBox />
+
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
               {/* PUBLISH BOX (matches reference) */}
@@ -1718,6 +1721,87 @@ function BlogEditor({ editingBlog, onBack }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Redirects Box ────────────────────────────────────────────────────────────
+function RedirectsBox() {
+  const [showRedirects, setShowRedirects] = useState(true);
+  const [query, setQuery] = useState("");
+  const [copiedSlug, setCopiedSlug] = useState(null);
+
+  const SITE_BLOG_BASE = "https://www.novaranatureestates.com/blog/";
+
+  const filtered = BLOGS.filter((b) =>
+    b.title?.toLowerCase().includes(query.toLowerCase()) ||
+    b.slug?.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const copyLink = (slug) => {
+    const url = SITE_BLOG_BASE + slug;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedSlug(slug);
+      setTimeout(() => setCopiedSlug(null), 2000);
+    });
+  };
+
+  return (
+    <div className="meta-box mt-5">
+      <button className="meta-box-head w-full" onClick={() => setShowRedirects((v) => !v)}>
+        <span className="meta-box-title flex items-center gap-1.5">
+          <Globe size={13} /> Redirects
+          <span className="text-[11px] font-normal text-[#787c82] ml-1">({BLOGS.length} blog links)</span>
+        </span>
+        <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showRedirects ? "rotate-180" : ""}`} />
+      </button>
+      {showRedirects && (
+        <div className="p-4 space-y-3">
+          <p className="text-[12px] text-[#646970] leading-relaxed">
+            All published blog redirect links. Click the link icon to copy the full URL.
+          </p>
+
+          {/* Search */}
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search blogs…"
+              className="w-full pl-7 pr-3 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white"
+            />
+          </div>
+
+          {/* Blog links list */}
+          <div className="space-y-1.5 max-h-72 overflow-auto row-scroll">
+            {filtered.map((blog) => {
+              const url = SITE_BLOG_BASE + blog.slug;
+              const copied = copiedSlug === blog.slug;
+              return (
+                <div key={blog.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-[#E6E1D3] bg-white hover:border-[#1A614F]/30 hover:bg-[#F4FAF7] transition-all group">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold text-[#15302A] truncate leading-snug">{blog.title}</div>
+                    <div className="text-[11px] text-[#1A614F] truncate mt-0.5 font-mono">{url}</div>
+                  </div>
+                  <button
+                    onClick={() => copyLink(blog.slug)}
+                    title="Copy link"
+                    className="shrink-0 mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center border border-[#E6E1D3] bg-[#F4F1E8] hover:bg-[#1A614F] hover:border-[#1A614F] hover:text-white text-[#5B6B63] transition-all"
+                  >
+                    {copied
+                      ? <CheckCircle size={13} className="text-[#1B9A63]" />
+                      : <LinkIcon size={13} />}
+                  </button>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="text-[12px] text-[#646970] text-center py-4">No blogs match "{query}"</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
