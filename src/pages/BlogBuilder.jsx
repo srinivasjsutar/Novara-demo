@@ -319,6 +319,7 @@ function BlogPicker({ onSelect }) {
   const { user, logout } = useAuth();
   const [query, setQuery] = useState("");
   const filtered = BLOGS.filter((b) =>
+    b.headline?.toLowerCase().includes(query.toLowerCase()) ||
     b.title?.toLowerCase().includes(query.toLowerCase()) ||
     b.slug?.toLowerCase().includes(query.toLowerCase()) ||
     b.category?.toLowerCase().includes(query.toLowerCase()),
@@ -402,11 +403,11 @@ function BlogPicker({ onSelect }) {
                 className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-[#E3A600] hover:shadow-md transition-all group text-left">
                 <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
                   {blog.heroImage || blog.image
-                    ? <img src={blog.heroImage || blog.image} alt={blog.title} className="w-full h-full object-cover" />
+                    ? <img src={blog.heroImage || blog.image} alt={blog.headline || blog.title} className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-slate-300" /></div>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-800 text-sm truncate group-hover:text-[#1A614F]">{blog.title}</div>
+                  <div className="font-semibold text-slate-800 text-sm group-hover:text-[#1A614F]" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{blog.headline || blog.title}</div>
                   <div className="text-[11px] text-[#1A614F] font-mono truncate mt-0.5 opacity-70 group-hover:opacity-100">https://www.novaranatureestates.com/blog/{blog.slug}</div>
                 </div>
                 <Edit3 size={14} className="text-slate-300 group-hover:text-[#E3A600] flex-shrink-0" />
