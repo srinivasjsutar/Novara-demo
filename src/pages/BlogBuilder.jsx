@@ -535,6 +535,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const [imageVideoPopup, setImageVideoPopup] = useState(null); // { videoUrl } for content image lightbox
   const [pendingImageUrl, setPendingImageUrl] = useState(null); // url of just-uploaded content image awaiting meta
   const [contentImageMeta, setContentImageMeta] = useState({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+  const [bodySnapshot, setBodySnapshot] = useState(""); // snapshot of editor HTML for preview
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishMsg, setPublishMsg] = useState("");
@@ -824,6 +825,10 @@ function BlogEditor({ editingBlog, onBack }) {
 
     setPendingImageUrl(null);
     setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+    // Snapshot body so preview can read it reliably
+    setTimeout(() => {
+      if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
+    }, 0);
   };
 
   const cancelContentImage = () => {
@@ -1060,7 +1065,8 @@ function BlogEditor({ editingBlog, onBack }) {
   // ── Preview sections ──────────────────────────────────────────────────────
   const previewSections = useMemo(() => {
     if (!previewMode) return [];
-    const html = bodyRef.current ? bodyRef.current.innerHTML : "";
+    // Use bodySnapshot (state) so React-inserted DOM changes are captured reliably
+    const html = bodySnapshot || (bodyRef.current ? bodyRef.current.innerHTML : "");
     const sections = htmlToSections(html);
     // Attach stored YouTube URLs to image sections
     return sections.map((s) =>
@@ -1068,7 +1074,7 @@ function BlogEditor({ editingBlog, onBack }) {
         ? { ...s, videoUrl: imageVideoMapRef.current[s.src] }
         : s
     );
-  }, [previewMode]);
+  }, [previewMode, bodySnapshot]);
 
   // ─────────────────────────────────────────────────────────────────────────
   const navItems = [
@@ -1242,7 +1248,7 @@ function BlogEditor({ editingBlog, onBack }) {
               <h1 className="text-[19px] font-extrabold text-[#15302A] tracking-tight">{isEditMode ? "Edit Post" : "Add New Post"}</h1>
               {isEditMode && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#FBF1D2", color: "#9a6b00" }}>Editing</span>}
             </div>
-            <button onClick={() => setPreviewMode(true)} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
+            <button onClick={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); setPreviewMode(true); }} className="wp-secondary flex items-center gap-1.5"><Eye size={13} /> Preview</button>
           </div>
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
@@ -1293,8 +1299,9 @@ function BlogEditor({ editingBlog, onBack }) {
                   suppressContentEditableWarning
                   data-placeholder="Start writing your post…"
                   onFocus={onEditorFocus}
-                  onKeyUp={syncFormatState}
+                  onKeyUp={(e) => { syncFormatState(e); if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); }}
                   onMouseUp={syncFormatState}
+                  onInput={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); }}
                 />
               </div>
 
@@ -1569,7 +1576,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 </div>
                 <div className="p-3">
                   <div className="flex justify-end mb-3">
-                    <button onClick={() => setPreviewMode(true)} className="wp-secondary">Preview Changes</button>
+                    <button onClick={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); setPreviewMode(true); }} className="wp-secondary">Preview Changes</button>
                   </div>
                   <ul className="space-y-2.5 text-[13px] text-[#5B6B63]">
                     <li className="flex items-center gap-2">
