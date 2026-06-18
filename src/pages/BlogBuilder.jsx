@@ -168,7 +168,10 @@ const htmlToSections = (html = "") => {
       const title = imgEl?.getAttribute("title") || "";
       const cap = node.querySelector ? (node.querySelector("figcaption")?.textContent.trim() || "") : "";
       const videoUrl = (tag === "figure" ? node.getAttribute("data-video-url") : null) || "";
-      if (src) out.push({ type: "image", src, alt, title, caption: cap, videoUrl });
+      const alignment = (tag === "figure" ? node.getAttribute("data-alignment") : null) || "center";
+      const imgWidth = imgEl?.getAttribute("data-width") || imgEl?.style?.width?.replace("px","") || "";
+      const imgHeight = imgEl?.getAttribute("data-height") || imgEl?.style?.height?.replace("px","") || "";
+      if (src) out.push({ type: "image", src, alt, title, caption: cap, videoUrl, alignment, imgWidth, imgHeight });
       return;
     }
     if (tag === "table") {
@@ -206,16 +209,22 @@ function PreviewSection({ s, usedH3, onPlayVideo }) {
   }
   if (s.type === "quote")
     return <div className="rounded-xl border border-[#F2E6C9] bg-[#FFF8E8] px-4 py-4 text-[14px] text-slate-700"><div className="border-l-4 border-[#E3A600] pl-3 italic leading-relaxed">{s.text}</div></div>;
-  if (s.type === "image")
+  if (s.type === "image") {
+    const figAlign = s.alignment === "left" ? "mr-auto ml-0" : s.alignment === "right" ? "ml-auto mr-0" : "mx-auto";
+    const figMaxW = s.imgWidth ? { maxWidth: s.imgWidth + "px" } : {};
+    const imgStyle = {};
+    if (s.imgWidth) { imgStyle.width = s.imgWidth + "px"; }
+    if (s.imgHeight) { imgStyle.height = s.imgHeight + "px"; imgStyle.objectFit = "cover"; }
     return (
-      <figure className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 relative group">
+      <figure className={`rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 relative group ${figAlign}`} style={figMaxW}>
         {s.src ? (
           <div className="relative">
             <img
               src={s.src}
               alt={s.alt || s.caption || ""}
               title={s.title || undefined}
-              className="w-full h-auto"
+              className={s.imgWidth ? "" : "w-full h-auto"}
+              style={imgStyle}
             />
             {s.videoUrl && getYouTubeId(s.videoUrl) && (
               <button
@@ -234,6 +243,7 @@ function PreviewSection({ s, usedH3, onPlayVideo }) {
         {s.caption && <figcaption className="px-4 py-3 text-[12px] text-slate-500">{s.caption}</figcaption>}
       </figure>
     );
+  }
   if (s.type === "ul")
     return <ul className="list-disc list-outside pl-5 space-y-2 text-[14px] text-slate-600">{(s.text || []).map((i, k) => <li key={k}>{i}</li>)}</ul>;
   if (s.type === "ol")
@@ -813,24 +823,35 @@ function BlogEditor({ editingBlog, onBack }) {
       addToMediaLib({ url, type: "content", name: file.name, addedAt: Date.now(), size: file.size });
       // Show meta panel instead of window.prompt
       setPendingImageUrl(url);
-      setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+      setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
     } catch (e) { alert("Image upload failed: " + e.message); }
     finally { setImageUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
   const insertContentImage = () => {
     if (!pendingImageUrl) return;
-    const { alt, title, caption, videoUrl } = contentImageMeta;
+    const { alt, title, caption, videoUrl, width, height, alignment } = contentImageMeta;
     const ytId = getYouTubeId(videoUrl);
     if (ytId) imageVideoMapRef.current[pendingImageUrl] = videoUrl;
 
     // Build the figure element directly in the DOM — more reliable than execCommand
     const figure = document.createElement("figure");
     if (videoUrl) figure.setAttribute("data-video-url", videoUrl);
+    if (alignment) figure.setAttribute("data-alignment", alignment);
+    // Apply alignment style to figure
+    const alignStyle = alignment === "left" ? "margin-right:auto;margin-left:0;" : alignment === "right" ? "margin-left:auto;margin-right:0;" : "margin-left:auto;margin-right:auto;";
+    const figWidth = width ? `max-width:${width}px;` : "";
+    figure.style.cssText = `${alignStyle}${figWidth}`;
     const img = document.createElement("img");
     img.src = pendingImageUrl;
     img.alt = alt || "";
     if (title) img.title = title;
+    if (width) img.setAttribute("data-width", width);
+    if (height) img.setAttribute("data-height", height);
+    // Apply inline dimensions
+    if (width) img.style.width = width + "px";
+    if (height) img.style.height = height + "px";
+    if (width || height) img.style.objectFit = "cover";
     figure.appendChild(img);
     if (caption) {
       const figcap = document.createElement("figcaption");
@@ -871,14 +892,14 @@ function BlogEditor({ editingBlog, onBack }) {
     }
 
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
     // Snapshot immediately — direct DOM read is synchronous
     if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
   };
 
   const cancelContentImage = () => {
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
   };
 
   const handleHeroImage = async (file) => {
@@ -1409,9 +1430,51 @@ function BlogEditor({ editingBlog, onBack }) {
                     <span className="meta-box-title flex items-center gap-1.5"><ImageIcon size={13} /> Image details</span>
                   </div>
                   <div className="p-4 space-y-3">
-                    {/* Preview */}
-                    <div className="relative rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8]">
-                      <img src={pendingImageUrl} alt="preview" className="w-full max-h-48 object-cover" />
+                    {/* Live preview with applied size */}
+                    <div className="rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8] flex" style={{
+                      justifyContent: contentImageMeta.alignment === "left" ? "flex-start" : contentImageMeta.alignment === "right" ? "flex-end" : "center"
+                    }}>
+                      <img src={pendingImageUrl} alt="preview"
+                        style={{
+                          width: contentImageMeta.width ? contentImageMeta.width + "px" : "100%",
+                          height: contentImageMeta.height ? contentImageMeta.height + "px" : "auto",
+                          objectFit: (contentImageMeta.width || contentImageMeta.height) ? "cover" : undefined,
+                          maxWidth: "100%",
+                          display: "block",
+                        }}
+                      />
+                    </div>
+
+                    {/* Size & Alignment */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="block">
+                        <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Width (px)</span>
+                        <input type="number" min="0" max="1200"
+                          value={contentImageMeta.width}
+                          onChange={(e) => setContentImageMeta((p) => ({ ...p, width: e.target.value }))}
+                          placeholder="auto"
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Height (px)</span>
+                        <input type="number" min="0" max="1200"
+                          value={contentImageMeta.height}
+                          onChange={(e) => setContentImageMeta((p) => ({ ...p, height: e.target.value }))}
+                          placeholder="auto"
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Alignment</span>
+                        <select value={contentImageMeta.alignment}
+                          onChange={(e) => setContentImageMeta((p) => ({ ...p, alignment: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
+                          <option value="left">⬅ Left</option>
+                          <option value="center">⬛ Center</option>
+                          <option value="right">➡ Right</option>
+                        </select>
+                      </label>
                     </div>
 
                     {/* YouTube video URL */}
