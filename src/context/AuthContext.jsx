@@ -11,8 +11,8 @@ const TOKEN_KEY = "novaraAuthToken";
 const HARDCODED_USERS = [
   {
     id: "admin",
-    email: "blogger@gmail.com",
-    password: "blogger123",
+    email: "admin@gmail.com",
+    password: "admin@123",
     role: "editor",   // editor = view + edit; viewer = view only
     name: "Novara Admin",
   },
