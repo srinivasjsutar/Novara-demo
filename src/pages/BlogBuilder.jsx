@@ -1600,6 +1600,7 @@ function BlogEditor({ editingBlog, onBack }) {
 
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
+              {activeNav !== "redirects" && (<>
               {/* PUBLISH BOX (matches reference) */}
               <div className="meta-box">
                 <div className="meta-box-head">
@@ -1705,6 +1706,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 </div>
               </div>
 
+              </>)}
               {/* DRAFTS BOX */}
               <div className="meta-box">
                 <button className="meta-box-head w-full" onClick={() => setShowDrafts((v) => !v)}>
