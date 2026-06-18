@@ -5,7 +5,7 @@ import {
   Palette, ChevronDown, Eye, EyeOff, Home, FileText, Image as MediaIcon,
   Leaf, LogIn, LogOut, Loader, AlertCircle, CheckCircle, Send, Search,
   Edit3, ArrowLeft, Plus, Upload, Settings, Calendar, Globe,
-  CircleDot, ChevronsUpDown, Code2, ArrowRight,
+  CircleDot, ChevronsUpDown, Code2, ArrowRight, Users as UsersIcon, Shield, Eye as ViewIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BLOGS } from "../data/blogs";
@@ -330,6 +330,7 @@ function BlogPicker({ onSelect }) {
     { id: "blog",      label: "Blogs",     Icon: FileText,   active: true,  onClick: () => {} },
     { id: "media",     label: "Media",     Icon: MediaIcon,  active: false, onClick: () => onSelect(null) },
     { id: "redirects", label: "Redirects", Icon: ArrowRight, active: false, onClick: () => onSelect(null) },
+    { id: "users",     label: "Users",     Icon: UsersIcon,  active: false, onClick: () => onSelect(null) },
   ];
 
   return (
@@ -397,24 +398,45 @@ function BlogPicker({ onSelect }) {
                 className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1A614F] w-44" />
             </div>
           </div>
-          <div className="space-y-2">
-            {filtered.map((blog) => (
-              <button key={blog.id} onClick={() => onSelect(blog)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-[#E3A600] hover:shadow-md transition-all group text-left">
-                <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
-                  {blog.heroImage || blog.image
-                    ? <img src={blog.heroImage || blog.image} alt={blog.headline || blog.title} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-slate-300" /></div>}
+          {filtered.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-sm">No blogs match "{query}"</div>
+          ) : (
+            Object.entries(
+              filtered.reduce((acc, b) => {
+                const cat = b.category || "Uncategorized";
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(b);
+                return acc;
+              }, {})
+            ).map(([category, blogs]) => (
+              <div key={category} className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{category}</span>
+                  <span className="text-[11px] text-slate-400">{blogs.length} blog{blogs.length !== 1 ? "s" : ""}</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-800 text-sm group-hover:text-[#1A614F]" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{blog.headline || blog.title}</div>
-                  <div className="text-[11px] text-[#1A614F] font-mono truncate mt-0.5 opacity-70 group-hover:opacity-100">https://www.novaranatureestates.com/blog/{blog.slug}</div>
+                <div className="space-y-2">
+                  {blogs.map((blog) => (
+                    <div key={blog.id}
+                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 transition-all group text-left">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
+                        {blog.heroImage || blog.image
+                          ? <img src={blog.heroImage || blog.image} alt={blog.headline || blog.title} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-slate-300" /></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-800 text-sm" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{blog.headline || blog.title}</div>
+                        <div className="text-[11px] text-[#1A614F] font-mono truncate mt-0.5 opacity-70">https://www.novaranatureestates.com/blog/{blog.slug}</div>
+                      </div>
+                      <button onClick={() => onSelect(blog)} title="Edit blog"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 text-slate-400 hover:border-[#E3A600] hover:text-[#E3A600] hover:bg-[#FFF8E6] transition-all flex-shrink-0">
+                        <Edit3 size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <Edit3 size={14} className="text-slate-300 group-hover:text-[#E3A600] flex-shrink-0" />
-              </button>
-            ))}
-            {filtered.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No blogs match "{query}"</div>}
-          </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -538,8 +560,10 @@ function BlogEditor({ editingBlog, onBack }) {
   const [editingDate, setEditingDate] = useState(false);
   const [showSchema, setShowSchema] = useState(true);
   const [showJsonLd, setShowJsonLd] = useState(false);
+  const [collapsedSchemas, setCollapsedSchemas] = useState({});
   const [schemas, setSchemas] = useState(() => initSchemas());
   const [imageVideoPopup, setImageVideoPopup] = useState(null); // { videoUrl } for content image lightbox
+  const [slugEditing, setSlugEditing] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState(null); // url of just-uploaded content image awaiting meta
   const [contentImageMeta, setContentImageMeta] = useState({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
   const [bodySnapshot, setBodySnapshot] = useState(""); // snapshot of editor HTML for preview
@@ -1092,6 +1116,7 @@ function BlogEditor({ editingBlog, onBack }) {
     { id: "home",      label: "Blogs",     Icon: FileText,   onClick: onBack },
     { id: "media",     label: "Media",     Icon: MediaIcon,  onClick: () => { setActiveNav("media"); setShowSettings(true); heroInputRef.current?.focus?.(); } },
     { id: "redirects", label: "Redirects", Icon: ArrowRight, onClick: () => setActiveNav("redirects") },
+    { id: "users",     label: "Users",     Icon: UsersIcon,  onClick: () => setActiveNav("users") },
   ];
 
   return (
@@ -1264,7 +1289,11 @@ function BlogEditor({ editingBlog, onBack }) {
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
             {/* CONTENT COLUMN */}
-            {activeNav === "redirects" ? (
+            {activeNav === "users" ? (
+              <div className="flex-1 min-w-0">
+                <UsersPanel ghToken={GH_TOKEN} ghRepo={GH_REPO} ghBranch={GH_BRANCH} />
+              </div>
+            ) : activeNav === "redirects" ? (
               <div className="flex-1 min-w-0">
                 <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6">
                   <div className="flex items-center gap-2 mb-4">
@@ -1297,13 +1326,26 @@ function BlogEditor({ editingBlog, onBack }) {
               <div className="mt-2 flex items-center flex-wrap gap-2 text-[13px] text-[#5B6B63]">
                 <span className="font-semibold">Permalink:</span>
                 <span className="text-[#1A614F]">{SITE_BASE}</span>
-                <input
-                  value={meta.slug}
-                  onChange={(e) => setMeta((p) => ({ ...p, slug: e.target.value }))}
-                  onBlur={(e) => { if (!e.target.value && meta.title) setMeta((p) => ({ ...p, slug: slugify(meta.title) })); }}
-                  placeholder="post-slug"
-                  className="px-2 py-1 rounded border border-[#DDD7C7] bg-[#F4F1E8] text-[#15302A] focus:outline-none focus:border-[#1A614F] min-w-[160px]"
-                />
+                {slugEditing ? (
+                  <div className="flex items-center gap-1">
+                    <input autoFocus
+                      value={meta.slug}
+                      onChange={(e) => setMeta((p) => ({ ...p, slug: e.target.value }))}
+                      onBlur={(e) => { if (!e.target.value && meta.title) setMeta((p) => ({ ...p, slug: slugify(meta.title) })); setSlugEditing(false); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setSlugEditing(false); }}
+                      placeholder="post-slug"
+                      className="px-2 py-1 rounded border border-[#1A614F] bg-white text-[#15302A] focus:outline-none min-w-[160px]"
+                    />
+                    <button onClick={() => setSlugEditing(false)} className="text-[11px] px-2 py-1 rounded bg-[#1A614F] text-white font-semibold">OK</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-1 rounded bg-[#F4F1E8] text-[#15302A] font-mono text-[12px] border border-[#DDD7C7]">{meta.slug || "post-slug"}</span>
+                    <button onClick={() => setSlugEditing(true)} title="Edit slug" className="w-6 h-6 rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors border border-[#DDD7C7]">
+                      <Edit3 size={11} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Add Media */}
@@ -1434,8 +1476,20 @@ function BlogEditor({ editingBlog, onBack }) {
                 </button>
                 {showSettings && (
                   <div className="p-3 space-y-3">
-                    <Field label="Meta title (<title>)"><input value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" /></Field>
-                    <Field label="Meta description"><textarea rows={3} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" /></Field>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-[#5B6B63]">Meta title (&lt;title&gt;)</label>
+                        <span className={`text-[11px] font-semibold ${meta.title.length > 60 ? "text-red-500" : meta.title.length > 50 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.title.length}/60</span>
+                      </div>
+                      <input maxLength={60} value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-[#5B6B63]">Meta description</label>
+                        <span className={`text-[11px] font-semibold ${meta.description.length > 160 ? "text-red-500" : meta.description.length > 140 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.description.length}/160</span>
+                      </div>
+                      <textarea rows={3} maxLength={160} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" />
+                    </div>
                     <Field label="Focus keyword(s)"><input value={meta.keywords} onChange={(e) => setMeta((p) => ({ ...p, keywords: e.target.value }))} placeholder="farmland near bangalore" className="wp-input" /></Field>
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Category"><input value={meta.category} onChange={(e) => setMeta((p) => ({ ...p, category: e.target.value }))} className="wp-input" /></Field>
@@ -1467,26 +1521,34 @@ function BlogEditor({ editingBlog, onBack }) {
                       if (!cfg) return null;
                       return (
                         <div key={def.id} className="border border-[#E6E1D3] rounded">
-                          {/* Section header: enable + mode */}
+                          {/* Section header: enable + mode + collapse */}
                           <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#F4F1E8] border-b border-[#E6E1D3]">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input type="checkbox" checked={cfg.enabled}
                                 onChange={(e) => setSchemaCfg(def.id, { enabled: e.target.checked })} />
                               <span className="text-[13px] font-bold text-[#15302A]">{def.label}</span>
                             </label>
-                            {cfg.enabled && (
-                              <div className="flex rounded overflow-hidden border border-[#DDD7C7] text-[11px] font-semibold shrink-0">
-                                {[["default", "Default"], ["upload", "Upload"]].map(([m, lbl]) => (
-                                  <button key={m} type="button" onClick={() => setSchemaCfg(def.id, { mode: m })}
-                                    className={`px-2.5 py-1 ${cfg.mode === m ? "bg-[#1A614F] text-white" : "bg-white text-[#1A614F]"}`}>
-                                    {lbl}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              {cfg.enabled && (
+                                <div className="flex rounded overflow-hidden border border-[#DDD7C7] text-[11px] font-semibold shrink-0">
+                                  {[["default", "Default"], ["upload", "Upload"]].map(([m, lbl]) => (
+                                    <button key={m} type="button" onClick={() => setSchemaCfg(def.id, { mode: m })}
+                                      className={`px-2.5 py-1 ${cfg.mode === m ? "bg-[#1A614F] text-white" : "bg-white text-[#1A614F]"}`}>
+                                      {lbl}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {cfg.enabled && (
+                                <button type="button" onClick={() => setCollapsedSchemas((p) => ({ ...p, [def.id]: !p[def.id] }))}
+                                  className="text-[11px] px-2 py-0.5 rounded border border-[#DDD7C7] bg-white text-[#5B6B63] hover:bg-[#EAF4EF] hover:text-[#1A614F] transition-colors font-semibold">
+                                  {collapsedSchemas[def.id] ? "Show" : "Hide"}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          {cfg.enabled && (
+                          {cfg.enabled && !collapsedSchemas[def.id] && (
                             <div className="p-3">
                               {/* ── Upload mode ── */}
                               {cfg.mode === "upload" ? (
@@ -1600,7 +1662,7 @@ function BlogEditor({ editingBlog, onBack }) {
 
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
-              {activeNav !== "redirects" && (<>
+              {activeNav !== "redirects" && activeNav !== "users" && (<>
               {/* PUBLISH BOX (matches reference) */}
               <div className="meta-box">
                 <div className="meta-box-head">
@@ -1742,6 +1804,205 @@ function BlogEditor({ editingBlog, onBack }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Users Panel ──────────────────────────────────────────────────────────────
+const USERS_FILE = "src/data/users.js";
+
+function UsersPanel({ ghToken, ghRepo, ghBranch }) {
+  const [users, setUsers]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [busy, setBusy]         = useState(false);
+  const [banner, setBanner]     = useState(null);
+
+  // Add user form
+  const [newEmail, setNewEmail]     = useState("");
+  const [newName, setNewName]       = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole]       = useState("viewer");
+
+  // Edit
+  const [editingId, setEditingId]   = useState(null);
+  const [editRole, setEditRole]     = useState("viewer");
+  const [editName, setEditName]     = useState("");
+
+  const ghHeaders = { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" };
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+        { headers: ghHeaders, cache: "no-store" });
+      if (res.status === 404) { setUsers([]); setLoading(false); return; }
+      if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+      const fileData = await res.json();
+      const binary = atob(fileData.content.replace(/\n/g, ""));
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      const text = new TextDecoder("utf-8").decode(bytes);
+      const stripped = text.replace(/^[\s\S]*?export\s+const\s+USERS\s*=\s*/, "").replace(/;?\s*$/, "").trim();
+      // eslint-disable-next-line no-new-func
+      const arr = new Function(`return ${stripped}`)();
+      setUsers(Array.isArray(arr) ? arr : []);
+    } catch (e) { setBanner({ type: "err", msg: e.message }); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchUsers(); /* eslint-disable-next-line */ }, []);
+
+  const commitUsers = async (nextArr, message) => {
+    setBusy(true); setBanner(null);
+    try {
+      let sha = undefined;
+      const head = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+        { headers: ghHeaders, cache: "no-store" });
+      if (head.ok) { const d = await head.json(); sha = d.sha; }
+
+      const entriesStr = nextArr.map((u) => "  " + JSON.stringify(u, null, 2).replace(/\n/g, "\n  ")).join(",\n");
+      const newContent = `export const USERS = [\n${entriesStr}\n];\n`;
+
+      const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}`, {
+        method: "PUT",
+        headers: { ...ghHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ message, content: btoa(unescape(encodeURIComponent(newContent))), branch: ghBranch, ...(sha ? { sha } : {}) }),
+      });
+      if (!putRes.ok) { const err = await putRes.json().catch(() => ({})); throw new Error(err.message || `Commit failed`); }
+      setUsers(nextArr);
+      setBanner({ type: "ok", msg: "Saved!" });
+      setTimeout(() => setBanner(null), 2500);
+      return true;
+    } catch (e) { setBanner({ type: "err", msg: e.message || "Save failed" }); return false; }
+    finally { setBusy(false); }
+  };
+
+  const addUser = async () => {
+    if (!newEmail.trim() || !newName.trim() || !newPassword.trim()) { setBanner({ type: "err", msg: "All fields are required" }); return; }
+    if (users.find((u) => u.email === newEmail.trim())) { setBanner({ type: "err", msg: "A user with this email already exists" }); return; }
+    const newUser = { id: Date.now(), email: newEmail.trim(), name: newName.trim(), password: newPassword.trim(), role: newRole, addedOn: new Date().toLocaleDateString("en-GB") };
+    const ok = await commitUsers([...users, newUser], `add user: ${newEmail.trim()} (${newRole})`);
+    if (ok) { setNewEmail(""); setNewName(""); setNewPassword(""); setNewRole("viewer"); }
+  };
+
+  const deleteUser = async (u) => {
+    if (!window.confirm(`Remove ${u.email}?`)) return;
+    await commitUsers(users.filter((x) => x.id !== u.id), `remove user: ${u.email}`);
+  };
+
+  const saveEdit = async (u) => {
+    const next = users.map((x) => x.id === u.id ? { ...x, role: editRole, name: editName } : x);
+    const ok = await commitUsers(next, `update user: ${u.email} role=${editRole}`);
+    if (ok) setEditingId(null);
+  };
+
+  const ROLE_CONFIG = {
+    viewer: { label: "View only", color: "#1A614F", bg: "#E9FFF3", icon: "👁" },
+    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️" },
+  };
+
+  return (
+    <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-2">
+        <UsersIcon size={18} className="text-[#1A614F]" />
+        <h2 className="text-[18px] font-extrabold text-[#15302A]">Users</h2>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full ml-1" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{users.length} users</span>
+      </div>
+      <p className="text-[13px] text-[#646970] -mt-4">Manage who can access the blog builder and what they can do.</p>
+
+      {/* Role legend */}
+      <div className="flex gap-3">
+        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
+          <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px]" style={{ background: cfg.bg, borderColor: cfg.color + "33" }}>
+            <span>{cfg.icon}</span>
+            <div>
+              <div className="font-bold" style={{ color: cfg.color }}>{cfg.label}</div>
+              <div className="text-[10px] text-slate-500">{role === "viewer" ? "Can read blogs only" : "Can read + create + edit blogs"}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
+
+      {/* Add user form */}
+      <div className="rounded-2xl p-5 space-y-3" style={{ background: "linear-gradient(135deg,#EAF7F0,#F0FBF5)", border: "1px solid #D5EAE0" }}>
+        <h3 className="font-bold text-[15px] text-[#15302A] flex items-center gap-2"><UsersIcon size={15} /> Add new user</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Name</label>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Email</label>
+            <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@email.com" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Password</label>
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
+            <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
+              <option value="viewer">👁 View only</option>
+              <option value="editor">✏️ View & Edit</option>
+            </select>
+          </div>
+        </div>
+        <button onClick={addUser} disabled={busy}
+          className="w-full py-2.5 rounded-xl text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
+          style={{ background: "#1A614F" }}>
+          {busy ? <><Loader size={14} className="animate-spin" /> Adding…</> : <><UsersIcon size={14} /> Add user</>}
+        </button>
+      </div>
+
+      {/* Users table */}
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-[#646970]"><Loader size={14} className="animate-spin" /> Loading users…</div>
+      ) : users.length === 0 ? (
+        <div className="text-center py-8 text-[13px] text-[#646970]">No users yet. Add one above.</div>
+      ) : (
+        <div className="rounded-xl border border-[#E6E1D3] overflow-hidden">
+          <div className="grid grid-cols-[1fr_1fr_120px_90px_80px] gap-2 px-4 py-2 bg-[#F4F1E8] text-[11px] font-bold text-[#5B6B63] uppercase tracking-wide">
+            <span>Name</span><span>Email</span><span>Role</span><span>Added</span><span>Actions</span>
+          </div>
+          <div className="divide-y divide-[#EFEADD]">
+            {users.map((u) => {
+              const isEditing = editingId === u.id;
+              const roleCfg = ROLE_CONFIG[u.role] || ROLE_CONFIG.viewer;
+              return (
+                <div key={u.id} className="grid grid-cols-[1fr_1fr_120px_90px_80px] gap-2 px-4 py-3 items-center bg-white text-[13px]">
+                  {isEditing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} className="px-2 py-1 text-[12px] rounded border border-[#1A614F] focus:outline-none" /> : <span className="font-semibold text-[#15302A]">{u.name}</span>}
+                  <span className="text-[#646970] truncate">{u.email}</span>
+                  {isEditing ? (
+                    <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="px-2 py-1 text-[12px] rounded border border-[#1A614F] focus:outline-none">
+                      <option value="viewer">👁 View only</option>
+                      <option value="editor">✏️ View & Edit</option>
+                    </select>
+                  ) : (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: roleCfg.bg, color: roleCfg.color }}>
+                      {roleCfg.icon} {roleCfg.label}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-[#646970]">{u.addedOn || "—"}</span>
+                  <div className="flex items-center gap-2">
+                    {!isEditing ? (
+                      <>
+                        <button onClick={() => { setEditingId(u.id); setEditRole(u.role); setEditName(u.name); }} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
+                        <button onClick={() => deleteUser(u)} disabled={busy} title="Remove" className="text-red-500 hover:opacity-70 font-bold text-[16px] leading-none">×</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => saveEdit(u)} disabled={busy} title="Save" className="text-[#1B9A63] hover:opacity-70"><CheckCircle size={15} /></button>
+                        <button onClick={() => setEditingId(null)} title="Cancel" className="text-[#b32d2e] hover:opacity-70 font-bold text-[16px] leading-none">×</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
