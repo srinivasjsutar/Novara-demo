@@ -1744,128 +1744,264 @@ function BlogEditor({ editingBlog, onBack }) {
   );
 }
 
-// ─── Redirects Box ────────────────────────────────────────────────────
-function RedirectsBox({ ghToken, ghRepo, ghBranch, ghFile, fetchCurrentFile, inline = false }) {
-  const SITE_BLOG_BASE = "https://www.novaranatureestates.com/blog/";
-  const [query, setQuery]         = useState("");
-  const [blogs, setBlogs]         = useState(() => BLOGS.map((b) => ({ id: b.id, title: b.title, headline: b.headline, slug: b.slug })));
+// --- Redirects Box (Ultimate Redirect style manager) -----------------------
+function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
+  const REDIRECTS_FILE = "src/data/redirects.js";
+
+  const [redirects, setRedirects] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy]           = useState(false);
+  const [banner, setBanner]       = useState(null); // { type:"ok"|"err", msg }
+
+  // Add form
+  const [fromUrl, setFromUrl] = useState("");
+  const [toUrl, setToUrl]     = useState("");
+  const [redirType, setRedirType] = useState("301");
+
+  // Edit
   const [editingId, setEditingId] = useState(null);
-  const [editSlug, setEditSlug]   = useState("");
-  const [savingId, setSavingId]   = useState(null);
-  const [savedId, setSavedId]     = useState(null);
-  const [errorId, setErrorId]     = useState(null);
-  const [errorMsg, setErrorMsg]   = useState("");
-  const [copiedId, setCopiedId]   = useState(null);
+  const [editFrom, setEditFrom]   = useState("");
+  const [editTo, setEditTo]       = useState("");
+  const [editType, setEditType]   = useState("301");
 
-  const filtered = blogs.filter((b) =>
-    b.headline?.toLowerCase().includes(query.toLowerCase()) ||
-    b.title?.toLowerCase().includes(query.toLowerCase()) ||
-    b.slug?.toLowerCase().includes(query.toLowerCase())
-  );
+  const [query, setQuery] = useState("");
 
-  const startEdit = (blog) => { setEditingId(blog.id); setEditSlug(blog.slug); setErrorId(null); setErrorMsg(""); };
-  const cancelEdit = () => { setEditingId(null); setEditSlug(""); };
+  const ghHeaders = {
+    Authorization: `token ${ghToken}`,
+    Accept: "application/vnd.github.v3+json",
+  };
 
-  const saveSlug = async (blog) => {
-    const newSlug = editSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/, "");
-    if (!newSlug || newSlug === blog.slug) { cancelEdit(); return; }
-    setSavingId(blog.id); setErrorId(null);
+  // Fetch redirects.js (handles file-not-found by starting empty)
+  const fetchRedirects = async () => {
+    setLoading(true); setLoadError("");
     try {
-      const { sha, blogsArray } = await fetchCurrentFile();
-      const idx = blogsArray.findIndex((b) => String(b.id) === String(blog.id) || b.slug === blog.slug);
-      if (idx === -1) throw new Error("Blog not found in blogs.js");
-      const updated = [...blogsArray];
-      updated[idx] = { ...updated[idx], slug: newSlug };
-      const entriesStr = updated.map((b) => "  " + JSON.stringify(b, null, 2).replace(/\n/g, "\n  ")).join(",\n");
-      const newContent = `export const BLOGS = [\n${entriesStr}\n];\n`;
-      const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${ghFile}`, {
+      const res = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${REDIRECTS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+        { headers: ghHeaders, cache: "no-store" });
+      if (res.status === 404) { setRedirects([]); setLoading(false); return; }
+      if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+      const fileData = await res.json();
+      const binary = atob(fileData.content.replace(/\n/g, ""));
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      const text = new TextDecoder("utf-8").decode(bytes);
+      const stripped = text.replace(/^[\s\S]*?export\s+const\s+REDIRECTS\s*=\s*/, "").replace(/;?\s*$/, "").trim();
+      // eslint-disable-next-line no-new-func
+      const arr = new Function(`return ${stripped}`)();
+      setRedirects(Array.isArray(arr) ? arr : []);
+    } catch (e) {
+      setLoadError(e.message || "Failed to load redirects");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchRedirects(); /* eslint-disable-next-line */ }, []);
+
+  // Commit the full redirects array back to redirects.js
+  const commitRedirects = async (nextArr, message) => {
+    setBusy(true); setBanner(null);
+    try {
+      // get current sha (if file exists)
+      let sha = undefined;
+      const head = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${REDIRECTS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+        { headers: ghHeaders, cache: "no-store" });
+      if (head.ok) { const d = await head.json(); sha = d.sha; }
+
+      const entriesStr = nextArr.map((r) => "  " + JSON.stringify(r, null, 2).replace(/\n/g, "\n  ")).join(",\n");
+      const newContent = `export const REDIRECTS = [\n${entriesStr}\n];\n`;
+
+      const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${REDIRECTS_FILE}`, {
         method: "PUT",
-        headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `update redirect: ${blog.slug} -> ${newSlug}`, content: btoa(unescape(encodeURIComponent(newContent))), sha, branch: ghBranch }),
+        headers: { ...ghHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message, content: btoa(unescape(encodeURIComponent(newContent))),
+          branch: ghBranch, ...(sha ? { sha } : {}),
+        }),
       });
       if (!putRes.ok) { const err = await putRes.json().catch(() => ({})); throw new Error(err.message || `Commit failed: HTTP ${putRes.status}`); }
-      setBlogs((prev) => prev.map((b) => String(b.id) === String(blog.id) ? { ...b, slug: newSlug } : b));
-      setSavedId(blog.id); setTimeout(() => setSavedId(null), 2500); setEditingId(null);
-    } catch (e) { setErrorId(blog.id); setErrorMsg(e.message || "Save failed"); }
-    finally { setSavingId(null); }
+
+      setRedirects(nextArr);
+      setBanner({ type: "ok", msg: "Saved!" });
+      setTimeout(() => setBanner(null), 2500);
+      return true;
+    } catch (e) {
+      setBanner({ type: "err", msg: e.message || "Save failed" });
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const copyLink = (slug) => {
-    navigator.clipboard.writeText(SITE_BLOG_BASE + slug).then(() => { setCopiedId(slug); setTimeout(() => setCopiedId(null), 2000); });
+  const addRedirect = async () => {
+    const from = fromUrl.trim();
+    const to = toUrl.trim();
+    if (!from || !to) { setBanner({ type: "err", msg: "Both URLs are required" }); return; }
+    const newItem = {
+      id: Date.now(),
+      from, to, type: redirType,
+      status: true,
+      date: new Date().toLocaleDateString("en-GB"),
+    };
+    const ok = await commitRedirects([newItem, ...redirects], `add redirect: ${from} -> ${to}`);
+    if (ok) { setFromUrl(""); setToUrl(""); setRedirType("301"); }
   };
 
-  const listContent = (
-    <div className={`space-y-2 ${inline ? "" : "p-3"}`}>
-      {!inline && <p className="text-[11px] text-[#646970] leading-relaxed">Edit any blog’s redirect slug. Changes save to <code className="bg-[#F4F1E8] px-1 rounded">blogs.js</code> immediately.</p>}
-      <div className="relative">
-        <Search size={inline ? 13 : 11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search blogs…"
-          className={`w-full pl-7 pr-2.5 py-1.5 rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white ${inline ? "text-[13px]" : "text-[11px]"}`} />
+  const toggleStatus = async (item) => {
+    const next = redirects.map((r) => r.id === item.id ? { ...r, status: !r.status } : r);
+    await commitRedirects(next, `toggle redirect ${item.from}`);
+  };
+
+  const deleteRedirect = async (item) => {
+    const next = redirects.filter((r) => r.id !== item.id);
+    await commitRedirects(next, `delete redirect ${item.from}`);
+  };
+
+  const startEdit = (item) => { setEditingId(item.id); setEditFrom(item.from); setEditTo(item.to); setEditType(item.type || "301"); };
+  const cancelEdit = () => { setEditingId(null); };
+  const saveEdit = async (item) => {
+    const next = redirects.map((r) => r.id === item.id ? { ...r, from: editFrom.trim(), to: editTo.trim(), type: editType } : r);
+    const ok = await commitRedirects(next, `edit redirect ${item.from}`);
+    if (ok) setEditingId(null);
+  };
+
+  const filtered = redirects.filter((r) =>
+    r.from?.toLowerCase().includes(query.toLowerCase()) ||
+    r.to?.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const body = (
+    <div className={inline ? "space-y-5" : "p-3 space-y-4"}>
+      {/* ADD A REDIRECT */}
+      <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg,#EAF7F0,#F0FBF5)", border: "1px solid #D5EAE0" }}>
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <LinkIcon size={18} className="text-[#1A614F]" />
+          <h3 className="text-[17px] font-extrabold text-[#15302A]">Add a redirect</h3>
+        </div>
+        <div className={`flex ${inline ? "flex-row items-end" : "flex-col"} gap-3`}>
+          <div className="flex-1 min-w-0">
+            <label className="block text-[12px] text-[#5B6B63] mb-1">Redirect from the <b>specific URL…</b></label>
+            <input value={fromUrl} onChange={(e) => setFromUrl(e.target.value)} placeholder="Enter the URL you want to redirect"
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div className="flex items-center justify-center text-[#1A614F] pb-2"><ArrowRight size={20} /></div>
+          <div className="flex-1 min-w-0">
+            <label className="block text-[12px] text-[#5B6B63] mb-1">…to a <b>specific URL:</b></label>
+            <input value={toUrl} onChange={(e) => setToUrl(e.target.value)} placeholder="Enter the URL you want to redirect to"
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-2 mt-3 text-[12px] text-[#5B6B63]">
+          <span>…with type</span>
+          <select value={redirType} onChange={(e) => setRedirType(e.target.value)}
+            className="px-2 py-1 rounded border border-[#C9DED4] bg-white text-[12px] focus:outline-none focus:border-[#1A614F]">
+            <option value="301">301 — Permanent</option>
+            <option value="302">302 — Found</option>
+            <option value="307">307 — Temporary</option>
+          </select>
+        </div>
+        <button onClick={addRedirect} disabled={busy}
+          className="w-full mt-4 py-3 rounded-xl text-white font-bold text-[15px] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+          style={{ background: "#1A614F" }}>
+          {busy ? <><Loader size={15} className="animate-spin" /> Working…</> : "Add this redirect!"}
+        </button>
+        {banner && (
+          <div className={`mt-3 text-center text-[12px] font-semibold ${banner.type === "ok" ? "text-[#1B9A63]" : "text-red-600"}`}>{banner.msg}</div>
+        )}
       </div>
-      <div className={`space-y-2 overflow-auto row-scroll ${inline ? "max-h-[60vh]" : "max-h-64"}`}>
-        {filtered.map((blog) => {
-          const isEditing = editingId === blog.id;
-          const isSaving  = savingId === blog.id;
-          const isSaved   = savedId === blog.id;
-          const isError   = errorId === blog.id;
-          return (
-            <div key={blog.id} className="rounded-lg border border-[#E6E1D3] bg-white overflow-hidden">
-              <div className={`flex items-center justify-between gap-1 ${inline ? "px-3 pt-2.5 pb-1" : "px-2.5 pt-2 pb-1"}`}>
-                <span className={`font-semibold text-[#15302A] leading-snug flex-1 ${inline ? "text-[13px]" : "text-[11px]"}`} style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{blog.headline || blog.title}</span>
-                <div className="flex gap-1 shrink-0">
-                  <button onClick={() => copyLink(blog.slug)} title="Copy URL"
-                    className={`rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors ${inline ? "w-6 h-6" : "w-5 h-5"}`}>
-                    {copiedId === blog.slug ? <CheckCircle size={inline ? 13 : 11} className="text-[#1B9A63]" /> : <LinkIcon size={inline ? 13 : 11} />}
-                  </button>
-                  {!isEditing ? (
-                    <button onClick={() => startEdit(blog)} title="Edit slug"
-                      className={`rounded flex items-center justify-center text-[#5B6B63] hover:text-[#1A614F] hover:bg-[#EAF4EF] transition-colors ${inline ? "w-6 h-6" : "w-5 h-5"}`}>
-                      <Edit3 size={inline ? 13 : 11} />
-                    </button>
-                  ) : (
-                    <button onClick={cancelEdit} title="Cancel"
-                      className={`rounded flex items-center justify-center text-[#b32d2e] hover:bg-red-50 transition-colors font-bold ${inline ? "w-6 h-6 text-[13px]" : "w-5 h-5 text-[11px]"}`}>
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className={inline ? "px-3 pb-3" : "px-2.5 pb-2"}>
-                {!isEditing ? (
-                  <div className={`text-[#1A614F] font-mono truncate ${inline ? "text-[12px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}{blog.slug}</div>
-                ) : (
-                  <div className="space-y-1.5 mt-1">
-                    <div className={`text-slate-400 font-mono truncate ${inline ? "text-[11px]" : "text-[10px]"}`}>{SITE_BLOG_BASE}</div>
-                    <input autoFocus value={editSlug} onChange={(e) => setEditSlug(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") saveSlug(blog); if (e.key === "Escape") cancelEdit(); }}
-                      className={`w-full px-2 py-1 font-mono rounded border border-[#1A614F] focus:outline-none focus:ring-1 focus:ring-[#1A614F]/30 text-[#15302A] ${inline ? "text-[13px]" : "text-[11px]"}`}
-                      placeholder="new-slug-here" />
-                    <button onClick={() => saveSlug(blog)} disabled={isSaving}
-                      className={`w-full flex items-center justify-center gap-1 py-1.5 rounded font-bold text-white transition-all disabled:opacity-60 ${inline ? "text-[13px]" : "text-[11px]"}`}
-                      style={{ background: "linear-gradient(135deg,#1A614F,#0d3d30)" }}>
-                      {isSaving ? <><Loader size={inline ? 13 : 11} className="animate-spin" /> Saving…</> : <><Send size={inline ? 13 : 11} /> Save redirect</>}
-                    </button>
-                  </div>
-                )}
-                {isSaved && <div className={`mt-1 flex items-center gap-1 text-[#1B9A63] font-semibold ${inline ? "text-[12px]" : "text-[10px]"}`}><CheckCircle size={inline ? 12 : 10} /> Saved!</div>}
-                {isError && <div className={`mt-1 text-red-600 font-semibold ${inline ? "text-[12px]" : "text-[10px]"}`}>{errorMsg}</div>}
-              </div>
+
+      {/* YOUR REDIRECTS */}
+      <div>
+        <div className="text-center mb-1">
+          <h3 className="text-[17px] font-extrabold text-[#15302A]">Your redirects</h3>
+          <p className="text-[12px] text-[#646970]">({redirects.length} specific URL redirects)</p>
+        </div>
+
+        <div className="flex items-center justify-end mb-2">
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search"
+              className="pl-7 pr-3 py-1.5 text-[12px] rounded-lg border border-[#DDD7C7] bg-white focus:outline-none focus:border-[#1A614F] w-40" />
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-6 text-[13px] text-[#646970] flex items-center justify-center gap-2"><Loader size={14} className="animate-spin" /> Loading redirects…</div>
+        ) : loadError ? (
+          <div className="text-center py-6 text-[13px] text-red-600">{loadError}</div>
+        ) : (
+          <div className="rounded-xl border border-[#E6E1D3] overflow-hidden">
+            {/* header row */}
+            <div className="hidden sm:grid grid-cols-[44px_1fr_1fr_84px_56px_60px] gap-2 px-3 py-2 bg-[#F4F1E8] text-[11px] font-bold text-[#5B6B63] uppercase tracking-wide">
+              <span>Status</span><span>Redirect from…</span><span>…to:</span><span>Date</span><span>Type</span><span>Actions</span>
             </div>
-          );
-        })}
-        {filtered.length === 0 && <p className={`text-[#646970] text-center py-3 ${inline ? "text-[13px]" : "text-[11px]"}`}>No blogs match “{query}”</p>}
+            <div className="divide-y divide-[#EFEADD] max-h-[50vh] overflow-auto row-scroll">
+              {filtered.map((item) => {
+                const isEditing = editingId === item.id;
+                return (
+                  <div key={item.id} className="grid grid-cols-[44px_1fr_1fr_84px_56px_60px] gap-2 px-3 py-2.5 items-center bg-white text-[12px]">
+                    {/* status toggle */}
+                    <button onClick={() => toggleStatus(item)} disabled={busy}
+                      className="relative w-10 h-5 rounded-full transition-colors shrink-0"
+                      style={{ background: item.status ? "#1A614F" : "#C9C9C9" }} title={item.status ? "On" : "Off"}>
+                      <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all" style={{ left: item.status ? "22px" : "2px" }} />
+                    </button>
+                    {/* from */}
+                    {!isEditing ? (
+                      <span className="font-mono text-[11px] text-[#15302A] truncate" title={item.from}>{item.from}</span>
+                    ) : (
+                      <input value={editFrom} onChange={(e) => setEditFrom(e.target.value)} className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#1A614F] focus:outline-none" />
+                    )}
+                    {/* to */}
+                    {!isEditing ? (
+                      <span className="font-mono text-[11px] text-[#1A614F] truncate" title={item.to}>{item.to}</span>
+                    ) : (
+                      <input value={editTo} onChange={(e) => setEditTo(e.target.value)} className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#1A614F] focus:outline-none" />
+                    )}
+                    {/* date */}
+                    <span className="text-[11px] text-[#646970]">{item.date}</span>
+                    {/* type */}
+                    {!isEditing ? (
+                      <span className="text-[11px] font-bold text-[#15302A]">{item.type || "301"}</span>
+                    ) : (
+                      <select value={editType} onChange={(e) => setEditType(e.target.value)} className="px-1 py-1 text-[11px] rounded border border-[#1A614F] focus:outline-none">
+                        <option value="301">301</option><option value="302">302</option><option value="307">307</option>
+                      </select>
+                    )}
+                    {/* actions */}
+                    <div className="flex items-center gap-1.5">
+                      {!isEditing ? (
+                        <>
+                          <button onClick={() => startEdit(item)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
+                          <button onClick={() => deleteRedirect(item)} disabled={busy} title="Delete" className="text-red-500 hover:opacity-70 font-bold text-[14px] leading-none">×</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => saveEdit(item)} disabled={busy} title="Save" className="text-[#1B9A63] hover:opacity-70"><CheckCircle size={15} /></button>
+                          <button onClick={cancelEdit} title="Cancel" className="text-[#b32d2e] hover:opacity-70 font-bold text-[14px] leading-none">×</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div className="text-center py-6 text-[13px] text-[#646970]">{redirects.length === 0 ? "No redirects yet. Add one above." : `No redirects match "${query}"`}</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 
-  if (inline) return listContent;
+  if (inline) return body;
 
   return (
     <div className="meta-box">
       <button className="meta-box-head w-full" onClick={() => {}}>
         <span className="meta-box-title flex items-center gap-1.5"><LinkIcon size={13} /> Redirects</span>
       </button>
-      {listContent}
+      {body}
     </div>
   );
 }
