@@ -564,6 +564,21 @@ function BlogEditor({ editingBlog, onBack }) {
   const [schemas, setSchemas] = useState(() => initSchemas());
   const [imageVideoPopup, setImageVideoPopup] = useState(null); // { videoUrl } for content image lightbox
   const [slugEditing, setSlugEditing] = useState(false);
+
+  // ── Media library (persisted in localStorage) ─────────────────────────────
+  const MEDIA_KEY = "novara_media_library";
+  const loadMediaLib = () => {
+    try { return JSON.parse(localStorage.getItem(MEDIA_KEY) || "[]"); } catch { return []; }
+  };
+  const [mediaLibrary, setMediaLibrary] = useState(loadMediaLib);
+  const addToMediaLib = (entry) => {
+    setMediaLibrary((prev) => {
+      if (prev.find((m) => m.url === entry.url)) return prev; // no duplicates
+      const next = [entry, ...prev];
+      try { localStorage.setItem(MEDIA_KEY, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
   const [pendingImageUrl, setPendingImageUrl] = useState(null); // url of just-uploaded content image awaiting meta
   const [contentImageMeta, setContentImageMeta] = useState({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
   const [bodySnapshot, setBodySnapshot] = useState(""); // snapshot of editor HTML for preview
@@ -795,6 +810,7 @@ function BlogEditor({ editingBlog, onBack }) {
     setImageUploading(true);
     try {
       const url = await compressAndUpload(file, { maxW: 1200, quality: 0.8 });
+      addToMediaLib({ url, type: "content", name: file.name, addedAt: Date.now(), size: file.size });
       // Show meta panel instead of window.prompt
       setPendingImageUrl(url);
       setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "" });
@@ -874,6 +890,7 @@ function BlogEditor({ editingBlog, onBack }) {
     try {
       const url = await compressAndUpload(file, { maxW: 1400, quality: 0.82 });
       setMeta((p) => ({ ...p, heroImage: url }));
+      addToMediaLib({ url, type: "featured", name: file.name, addedAt: Date.now(), size: file.size });
     } catch (e) { alert("Featured image upload failed: " + e.message); }
     finally {
       setHeroUploading(false);
@@ -1114,7 +1131,7 @@ function BlogEditor({ editingBlog, onBack }) {
   const navItems = [
     { id: "blog",      label: "Home",      Icon: Home,       onClick: () => setActiveNav("blog") },
     { id: "home",      label: "Blogs",     Icon: FileText,   onClick: onBack },
-    { id: "media",     label: "Media",     Icon: MediaIcon,  onClick: () => { setActiveNav("media"); setShowSettings(true); heroInputRef.current?.focus?.(); } },
+    { id: "media",     label: "Media",     Icon: MediaIcon,  onClick: () => setActiveNav("media") },
     { id: "redirects", label: "Redirects", Icon: ArrowRight, onClick: () => setActiveNav("redirects") },
     { id: "users",     label: "Users",     Icon: UsersIcon,  onClick: () => setActiveNav("users") },
   ];
@@ -1289,7 +1306,11 @@ function BlogEditor({ editingBlog, onBack }) {
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
             {/* CONTENT COLUMN */}
-            {activeNav === "users" ? (
+            {activeNav === "media" ? (
+              <div className="flex-1 min-w-0">
+                <MediaLibraryPage mediaLibrary={mediaLibrary} setMediaLibrary={setMediaLibrary} MEDIA_KEY={MEDIA_KEY} />
+              </div>
+            ) : activeNav === "users" ? (
               <div className="flex-1 min-w-0">
                 <UsersPanel ghToken={GH_TOKEN} ghRepo={GH_REPO} ghBranch={GH_BRANCH} />
               </div>
@@ -1662,7 +1683,7 @@ function BlogEditor({ editingBlog, onBack }) {
 
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
-              {activeNav !== "redirects" && activeNav !== "users" && (<>
+              {activeNav !== "redirects" && activeNav !== "users" && activeNav !== "media" && (<>
               {/* PUBLISH BOX (matches reference) */}
               <div className="meta-box">
                 <div className="meta-box-head">
@@ -1804,6 +1825,149 @@ function BlogEditor({ editingBlog, onBack }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Media Library Page ────────────────────────────────────────────────────────
+function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
+  const [query, setQuery]     = useState("");
+  const [filter, setFilter]   = useState("all"); // all | featured | content
+  const [copied, setCopied]   = useState(null);
+  const [preview, setPreview] = useState(null);
+
+  const filtered = mediaLibrary.filter((m) => {
+    const matchQ = !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase());
+    const matchF = filter === "all" || m.type === filter;
+    return matchQ && matchF;
+  });
+
+  const copyUrl = (url) => {
+    navigator.clipboard.writeText(url).then(() => { setCopied(url); setTimeout(() => setCopied(null), 2000); });
+  };
+
+  const deleteItem = (url) => {
+    setMediaLibrary((prev) => {
+      const next = prev.filter((m) => m.url !== url);
+      try { localStorage.setItem(MEDIA_KEY, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
+
+  const formatSize = (bytes) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const formatDate = (ts) => {
+    if (!ts) return "";
+    return new Date(ts).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  return (
+    <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MediaIcon size={18} className="text-[#1A614F]" />
+          <h2 className="text-[18px] font-extrabold text-[#15302A]">Media Library</h2>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{mediaLibrary.length} files</span>
+        </div>
+      </div>
+      <p className="text-[13px] text-[#646970] -mt-3">All images uploaded through the blog builder — featured images and content images — are stored here.</p>
+
+      {/* Filters + search */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex rounded-lg overflow-hidden border border-[#DDD7C7] text-[12px] font-semibold">
+          {[["all", "All"], ["featured", "Featured"], ["content", "Content"]].map(([val, lbl]) => (
+            <button key={val} onClick={() => setFilter(val)}
+              className={`px-3 py-1.5 transition-colors ${filter === val ? "bg-[#1A614F] text-white" : "bg-white text-[#5B6B63] hover:bg-[#EAF4EF]"}`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by filename or URL…"
+            className="w-full pl-8 pr-3 py-1.5 text-[12px] rounded-lg border border-[#DDD7C7] bg-white focus:outline-none focus:border-[#1A614F]" />
+        </div>
+      </div>
+
+      {/* Grid */}
+      {mediaLibrary.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#F4F1E8" }}>
+            <MediaIcon size={28} className="text-[#C9C9C9]" />
+          </div>
+          <p className="text-[15px] font-bold text-[#5B6B63]">No media yet</p>
+          <p className="text-[13px] text-[#9FC1B5] mt-1">Images you upload as featured or content images will appear here automatically.</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-10 text-[13px] text-[#646970]">No media matches your search.</div>
+      ) : (
+        <div className="grid grid-cols-3 gap-4">
+          {filtered.map((item) => (
+            <div key={item.url} className="group relative rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8] cursor-pointer"
+              onClick={() => setPreview(item)}>
+              <div className="aspect-video overflow-hidden bg-[#F4F1E8]">
+                <img src={item.url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+              </div>
+              {/* Type badge */}
+              <div className="absolute top-2 left-2">
+                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+                  style={{ background: item.type === "featured" ? "#FBF1D2" : "#E9FFF3", color: item.type === "featured" ? "#9a6b00" : "#1B9A63" }}>
+                  {item.type === "featured" ? "Featured" : "Content"}
+                </span>
+              </div>
+              {/* Hover actions */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); copyUrl(item.url); }} title="Copy URL"
+                  className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-[#1A614F] hover:bg-white transition-colors">
+                  {copied === item.url ? <CheckCircle size={15} className="text-[#1B9A63]" /> : <LinkIcon size={15} />}
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); deleteItem(item.url); }} title="Remove from library"
+                  className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-red-500 hover:bg-white transition-colors">
+                  <span className="font-bold text-[16px] leading-none">×</span>
+                </button>
+              </div>
+              {/* Filename */}
+              <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
+                <p className="text-[11px] font-semibold text-[#15302A] truncate">{item.name || "Untitled"}</p>
+                <p className="text-[10px] text-[#9FC1B5]">{formatDate(item.addedAt)}{item.size ? ` · ${formatSize(item.size)}` : ""}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Preview lightbox */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-2xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <img src={preview.url} alt={preview.name} className="w-full max-h-[60vh] object-contain bg-[#F4F1E8]" />
+            <div className="p-4 space-y-2">
+              <p className="font-bold text-[#15302A] text-[14px]">{preview.name}</p>
+              <p className="text-[12px] text-[#646970] font-mono break-all">{preview.url}</p>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => copyUrl(preview.url)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
+                  {copied === preview.url ? <><CheckCircle size={13} /> Copied!</> : <><LinkIcon size={13} /> Copy URL</>}
+                </button>
+                <button onClick={() => { deleteItem(preview.url); setPreview(null); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-red-300 text-red-500 hover:bg-red-50 transition-colors">
+                  Remove from library
+                </button>
+                <button onClick={() => setPreview(null)}
+                  className="ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#F4F1E8] text-[#5B6B63] hover:bg-[#E6E1D3] transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
