@@ -2277,9 +2277,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
   };
 
   const ROLE_CONFIG = {
-    viewer: { label: "View only",   color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
-    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
-    admin:  { label: "Admin",       color: "#7c3aed", bg: "#F3F0FF", icon: "🛡️", desc: "Full access to everything" },
+    viewer: { label: "Viewer", color: "#5B6B63", bg: "#F4F1E8" },
+    editor: { label: "Editor", color: "#5B6B63", bg: "#F4F1E8" },
+    admin:  { label: "Admin",  color: "#5B6B63", bg: "#F4F1E8" },
   };
 
   const exportUsersExcel=()=>{const rows=[["ID","Name","Email","Role","Added On"]];users.forEach((u)=>rows.push([u.id,u.name,u.email,u.role,u.addedOn||""]));const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(blob),download:"users.csv"});a.click();URL.revokeObjectURL(a.href);};
@@ -2325,9 +2325,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
             <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
               className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
-              <option value="viewer">👁 View only</option>
-              <option value="editor">✏️ View & Edit</option>
-              <option value="admin">🛡️ Admin</option>
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Admin</option>
             </select>
           </div>
         </div>
@@ -2356,9 +2356,7 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
                   <span className="font-semibold text-[#15302A] truncate">{u.name}</span>
                   <span className="text-[#646970] truncate">{u.email}</span>
                   <span className="font-mono text-[12px] text-[#9FC1B5] tracking-widest">••••••</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: roleCfg.bg, color: roleCfg.color }}>
-                    {roleCfg.icon} {roleCfg.label}
-                  </span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded border border-[#DDD7C7] text-[#5B6B63] bg-[#F4F1E8]">{roleCfg.label}</span>
                   <span className="text-[11px] text-[#646970]">{u.addedOn || "—"}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => openEdit(u)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
@@ -2407,9 +2405,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
                 <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
                 <select value={editRole} onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
-                  <option value="viewer">👁 View only</option>
-                  <option value="editor">✏️ View & Edit</option>
-                  <option value="admin">🛡️ Admin</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
             </div>
