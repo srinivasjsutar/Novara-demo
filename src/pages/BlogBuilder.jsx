@@ -2266,8 +2266,8 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
   };
 
   const ROLE_CONFIG = {
-    viewer: { label: "View only",   color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
-    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
+    viewer: { label: "Viewer",      color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
+    editor: { label: "Editor",      color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
     admin:  { label: "Admin",       color: "#7c3aed", bg: "#F3F0FF", icon: "🛡️", desc: "Full access to everything" },
   };
 
@@ -2280,19 +2280,6 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full ml-1" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{users.length} users</span>
       </div>
       <p className="text-[13px] text-[#646970] -mt-4">Manage who can access the blog builder and what they can do.</p>
-
-      {/* Role legend */}
-      <div className="flex flex-wrap gap-3">
-        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-          <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px]" style={{ background: cfg.bg, borderColor: cfg.color + "33" }}>
-            <span>{cfg.icon}</span>
-            <div>
-              <div className="font-bold" style={{ color: cfg.color }}>{cfg.label}</div>
-              <div className="text-[10px] text-slate-500">{cfg.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
 
@@ -2325,9 +2312,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
             <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
               className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
-              <option value="viewer">👁 View only</option>
-              <option value="editor">✏️ View & Edit</option>
-              <option value="admin">🛡️ Admin</option>
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Admin</option>
             </select>
           </div>
         </div>
@@ -2407,9 +2394,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
                 <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
                 <select value={editRole} onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
-                  <option value="viewer">👁 View only</option>
-                  <option value="editor">✏️ View & Edit</option>
-                  <option value="admin">🛡️ Admin</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
             </div>
