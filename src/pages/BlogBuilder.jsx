@@ -1980,36 +1980,6 @@ function BlogEditor({ editingBlog, onBack }) {
               </div>
 
               </>)}
-              {/* DRAFTS BOX */}
-              <div className="meta-box">
-                <button className="meta-box-head w-full" onClick={() => setShowDrafts((v) => !v)}>
-                  <span className="meta-box-title">Drafts &amp; export</span>
-                  <ChevronDown size={15} className={`text-[#787c82] transition-transform ${showDrafts ? "rotate-180" : ""}`} />
-                </button>
-                {showDrafts && (
-                  <div className="p-3 space-y-2">
-                    <div className="flex gap-2">
-                      <button onClick={downloadExcel} className="wp-secondary w-full flex items-center justify-center gap-1"><Upload size={12} /> Export Excel</button>
-                    </div>
-                    <div className="space-y-1.5 max-h-48 overflow-auto row-scroll">
-                      {drafts.length === 0 && <p className="text-[12px] text-[#646970]">No saved drafts.</p>}
-                      {drafts.map((d) => (
-                        <div key={d.key} className="flex items-center justify-between gap-2 p-2 border border-[#E6E1D3] rounded">
-                          <div className="min-w-0">
-                            <div className="text-[12px] font-semibold text-[#15302A] truncate">{d.data.meta?.title || "Untitled"}</div>
-                            <div className="text-[10px] text-[#646970]">{new Date(d.data.savedAt).toLocaleString()}</div>
-                          </div>
-                          <div className="flex gap-1 shrink-0">
-                            <button onClick={() => loadDraft(d.key)} className="wp-link">Open</button>
-                            <button onClick={() => deleteDraft(d.key)} className="text-[12px] text-[#b32d2e] hover:underline">Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
             </div>
           </div>
         </div>
@@ -2020,14 +1990,81 @@ function BlogEditor({ editingBlog, onBack }) {
 
 // ─── Media Library Page ────────────────────────────────────────────────────────
 function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
-  const [query, setQuery]         = useState("");
-  const [filter, setFilter]       = useState("all");
-  const [copied, setCopied]       = useState(null);
-  const [preview, setPreview]     = useState(null);
+  const [query, setQuery]           = useState("");
+  const [filter, setFilter]         = useState("all");
+  const [copied, setCopied]         = useState(null);
+  const [preview, setPreview]       = useState(null);
   const [editingUrl, setEditingUrl] = useState(null);
   const [editFields, setEditFields] = useState({});
-  const openEdit=(item)=>{setEditingUrl(item.url);setEditFields({name:item.name||"",fileFormat:item.fileFormat||"",fileSize:item.fileSize||"",naturalW:item.naturalW||"",naturalH:item.naturalH||""});};
-  const saveEdit=(url)=>{setMediaLibrary((prev)=>{const next=prev.map((m)=>m.url===url?{...m,...editFields}:m);try{localStorage.setItem(MEDIA_KEY,JSON.stringify(next));}catch(_){}return next;});setEditingUrl(null);setEditFields({});};
+  const [loadingMeta, setLoadingMeta] = useState(false);
+
+  // Merge BLOGS images into the media library (auto-detect on mount)
+  useEffect(() => {
+    setLoadingMeta(true);
+    const existingUrls = new Set(mediaLibrary.map((m) => m.url));
+    const blogImages = [];
+    BLOGS.forEach((blog) => {
+      const url = blog.heroImage || blog.image || blog.coverImage;
+      if (url && !existingUrls.has(url)) {
+        // Detect file info from URL
+        const parts = url.split("/");
+        const raw = parts[parts.length - 1] || "";
+        const filename = raw.split("?")[0];
+        const ext = filename.split(".").pop().toUpperCase();
+        blogImages.push({
+          url,
+          type: "featured",
+          name: blog.title || filename,
+          fileFormat: ext || "WEBP",
+          fileSize: "",
+          naturalW: "",
+          naturalH: "",
+          addedAt: null,
+          blogTitle: blog.title,
+          blogSlug: blog.slug,
+        });
+        existingUrls.add(url);
+      }
+    });
+    if (blogImages.length > 0) {
+      // Detect natural dimensions for each blog image
+      let resolved = 0;
+      blogImages.forEach((entry) => {
+        const img = new window.Image();
+        img.onload = () => {
+          entry.naturalW = String(img.naturalWidth);
+          entry.naturalH = String(img.naturalHeight);
+          resolved++;
+          if (resolved === blogImages.length) {
+            setMediaLibrary((prev) => {
+              const combined = [...prev, ...blogImages];
+              try { localStorage.setItem(MEDIA_KEY, JSON.stringify(combined)); } catch (_) {}
+              return combined;
+            });
+            setLoadingMeta(false);
+          }
+        };
+        img.onerror = () => {
+          resolved++;
+          if (resolved === blogImages.length) {
+            setMediaLibrary((prev) => {
+              const combined = [...prev, ...blogImages];
+              try { localStorage.setItem(MEDIA_KEY, JSON.stringify(combined)); } catch (_) {}
+              return combined;
+            });
+            setLoadingMeta(false);
+          }
+        };
+        img.src = entry.url;
+      });
+    } else {
+      setLoadingMeta(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openEdit  = (item) => { setEditingUrl(item.url); setEditFields({ name: item.name||"", fileFormat: item.fileFormat||"", fileSize: item.fileSize||"", naturalW: item.naturalW||"", naturalH: item.naturalH||"" }); };
+  const saveEdit  = (url)  => { setMediaLibrary((prev) => { const next = prev.map((m) => m.url === url ? { ...m, ...editFields } : m); try { localStorage.setItem(MEDIA_KEY, JSON.stringify(next)); } catch (_) {} return next; }); setEditingUrl(null); setEditFields({}); };
 
   const filtered = mediaLibrary.filter((m) => {
     const matchQ = !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase());
@@ -2089,13 +2126,17 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
       </div>
 
       {/* Grid */}
-      {mediaLibrary.length === 0 ? (
+      {loadingMeta ? (
+        <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-[#646970]">
+          <Loader size={16} className="animate-spin text-[#1A614F]" /> Fetching images from blogs…
+        </div>
+      ) : mediaLibrary.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#F4F1E8" }}>
             <MediaIcon size={28} className="text-[#C9C9C9]" />
           </div>
           <p className="text-[15px] font-bold text-[#5B6B63]">No media yet</p>
-          <p className="text-[13px] text-[#9FC1B5] mt-1">Images you upload as featured or content images will appear here automatically.</p>
+          <p className="text-[13px] text-[#9FC1B5] mt-1">Images from your blogs will appear here automatically.</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-[13px] text-[#646970]">No media matches your search.</div>
