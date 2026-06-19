@@ -894,7 +894,7 @@ function BlogEditor({ editingBlog, onBack }) {
       setContentImageMeta({
         alt: "", title: "", caption: "", description: "", videoUrl: "",
         width: String(dims.w || ""), height: String(dims.h || ""),
-        alignment: "center",
+        alignment: "center", sizePreset: "large",
         filename: file.name,
         fileFormat: fmt,
         fileSize: kb,
@@ -978,7 +978,7 @@ function BlogEditor({ editingBlog, onBack }) {
     }
 
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", sizePreset: "large", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
     // Snapshot immediately — direct DOM read is synchronous
     if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
   };
@@ -988,7 +988,7 @@ function BlogEditor({ editingBlog, onBack }) {
     // Remove any highlight
     document.querySelectorAll(".wp-editor figure.selected-for-edit").forEach((el) => el.classList.remove("selected-for-edit"));
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", sizePreset: "large", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
   };
 
   const handleHeroImage = async (file) => {
@@ -1040,12 +1040,7 @@ function BlogEditor({ editingBlog, onBack }) {
     };
   };
 
-  const downloadJSON = () => {
-    const d = exportBlogData();
-    const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
-    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `blog-${d.slug}.json` });
-    a.click(); URL.revokeObjectURL(a.href);
-  };
+  const downloadExcel = () => { const d=exportBlogData(); const rows=[["Field","Value"]]; const flat=(obj,pre="")=>Object.entries(obj).forEach(([k,v])=>{const key=pre?`${pre}.${k}`:k;if(v&&typeof v==="object"&&!Array.isArray(v))flat(v,key);else rows.push([key,Array.isArray(v)?v.join(", "):String(v??"")])}); flat(d); const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n"); const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(blob),download:`blog-${d.slug||"export"}.csv`}); a.click(); URL.revokeObjectURL(a.href); };
 
   // ── GitHub publish ──────────────────────────────────────────────────────────
   const GH_TOKEN  = import.meta.env.VITE_GH_TOKEN;
@@ -1578,36 +1573,35 @@ function BlogEditor({ editingBlog, onBack }) {
                       </div>
                     </div>
 
-                    {/* Width / Height / Alignment */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="block">
-                        <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Width (px)</span>
-                        <input type="number" min="0" max="1200"
-                          value={contentImageMeta.width}
-                          onChange={(e) => setContentImageMeta((p) => ({ ...p, width: e.target.value }))}
-                          placeholder="auto"
-                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Height (px)</span>
-                        <input type="number" min="0" max="1200"
-                          value={contentImageMeta.height}
-                          onChange={(e) => setContentImageMeta((p) => ({ ...p, height: e.target.value }))}
-                          placeholder="auto"
-                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"
-                        />
-                      </label>
-                      <label className="block">
+                    {/* Size preset + Alignment */}
+                    <div className="space-y-2">
+                      <div>
+                        <span className="block mb-1.5 text-[11px] font-semibold text-[#5B6B63]">Image size</span>
+                        <div className="flex gap-2">
+                          {[["small","Small",0.33],["medium","Medium",0.66],["large","Large",1]].map(([val,lbl,scale])=>{
+                            const pw=Math.round((Number(contentImageMeta.naturalW)||800)*scale);
+                            const ph=Math.round((Number(contentImageMeta.naturalH)||600)*scale);
+                            const active=contentImageMeta.sizePreset===val;
+                            return(<button key={val} type="button" onClick={()=>setContentImageMeta((p)=>({...p,sizePreset:val,width:String(pw),height:String(ph)}))}
+                              className="flex-1 py-2 rounded-lg text-[12px] font-semibold border transition-all"
+                              style={active?{background:"#1A614F",color:"#fff",borderColor:"#1A614F"}:{background:"#F4F1E8",color:"#5B6B63",borderColor:"#DDD7C7"}}>
+                              {lbl}<span className="block text-[10px] font-normal opacity-70">{pw}×{ph}px</span>
+                            </button>);
+                          })}
+                        </div>
+                      </div>
+                      <div>
                         <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Alignment</span>
-                        <select value={contentImageMeta.alignment}
-                          onChange={(e) => setContentImageMeta((p) => ({ ...p, alignment: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 text-[12px] rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
-                          <option value="left">⬅ Left</option>
-                          <option value="center">⬛ Center</option>
-                          <option value="right">➡ Right</option>
-                        </select>
-                      </label>
+                        <div className="flex gap-2">
+                          {[["left","⬅ Left"],["center","⬛ Center"],["right","➡ Right"]].map(([val,lbl])=>(
+                            <button key={val} type="button" onClick={()=>setContentImageMeta((p)=>({...p,alignment:val}))}
+                              className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold border transition-all"
+                              style={contentImageMeta.alignment===val?{background:"#1A614F",color:"#fff",borderColor:"#1A614F"}:{background:"#F4F1E8",color:"#5B6B63",borderColor:"#DDD7C7"}}>
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                     {/* YouTube video URL */}
@@ -1696,16 +1690,16 @@ function BlogEditor({ editingBlog, onBack }) {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-semibold text-[#5B6B63]">Meta title (&lt;title&gt;)</label>
-                        <span className={`text-[11px] font-semibold ${meta.title.length > 60 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.title.length} chars</span>
+                        <span className={`text-[11px] font-semibold ${meta.title.length > 60 ? "text-red-500" : meta.title.length > 50 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.title.length}/60</span>
                       </div>
-                      <input value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" />
+                      <input maxLength={60} value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-semibold text-[#5B6B63]">Meta description</label>
-                        <span className={`text-[11px] font-semibold ${meta.description.length > 160 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.description.length} chars</span>
+                        <span className={`text-[11px] font-semibold ${meta.description.length > 160 ? "text-red-500" : meta.description.length > 140 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.description.length}/160</span>
                       </div>
-                      <textarea rows={3} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" />
+                      <textarea rows={3} maxLength={160} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" />
                     </div>
                     <Field label="Focus keyword(s)"><input value={meta.keywords} onChange={(e) => setMeta((p) => ({ ...p, keywords: e.target.value }))} placeholder="farmland near bangalore" className="wp-input" /></Field>
                     <div className="grid grid-cols-2 gap-2">
@@ -1996,7 +1990,7 @@ function BlogEditor({ editingBlog, onBack }) {
                   <div className="p-3 space-y-2">
                     <div className="flex gap-2">
                       <button onClick={saveDraft} className="wp-secondary flex-1">Save draft</button>
-                      <button onClick={downloadJSON} className="wp-secondary flex-1 flex items-center justify-center gap-1"><Upload size={12} /> JSON</button>
+                      <button onClick={downloadExcel} className="wp-secondary flex-1 flex items-center justify-center gap-1"><Upload size={12} /> Excel</button>
                     </div>
                     <div className="space-y-1.5 max-h-48 overflow-auto row-scroll">
                       {drafts.length === 0 && <p className="text-[12px] text-[#646970]">No saved drafts.</p>}
@@ -2027,10 +2021,14 @@ function BlogEditor({ editingBlog, onBack }) {
 
 // ─── Media Library Page ────────────────────────────────────────────────────────
 function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
-  const [query, setQuery]     = useState("");
-  const [filter, setFilter]   = useState("all"); // all | featured | content
-  const [copied, setCopied]   = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [query, setQuery]         = useState("");
+  const [filter, setFilter]       = useState("all");
+  const [copied, setCopied]       = useState(null);
+  const [preview, setPreview]     = useState(null);
+  const [editingUrl, setEditingUrl] = useState(null);
+  const [editFields, setEditFields] = useState({});
+  const openEdit=(item)=>{setEditingUrl(item.url);setEditFields({name:item.name||"",fileFormat:item.fileFormat||"",fileSize:item.fileSize||"",naturalW:item.naturalW||"",naturalH:item.naturalH||""});};
+  const saveEdit=(url)=>{setMediaLibrary((prev)=>{const next=prev.map((m)=>m.url===url?{...m,...editFields}:m);try{localStorage.setItem(MEDIA_KEY,JSON.stringify(next));}catch(_){}return next;});setEditingUrl(null);setEditFields({});};
 
   const filtered = mediaLibrary.filter((m) => {
     const matchQ = !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase());
@@ -2105,34 +2103,48 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {filtered.map((item) => (
-            <div key={item.url} className="group relative rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8] cursor-pointer"
-              onClick={() => setPreview(item)}>
-              <div className="aspect-video overflow-hidden bg-[#F4F1E8]">
-                <img src={item.url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+            <div key={item.url} className="rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8]">
+              <div className="aspect-video overflow-hidden relative group cursor-pointer" onClick={()=>setPreview(item)}>
+                <img src={item.url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
+                <div className="absolute top-2 left-2"><span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{background:item.type==="featured"?"#FBF1D2":"#E9FFF3",color:item.type==="featured"?"#9a6b00":"#1B9A63"}}>{item.type==="featured"?"Featured":"Content"}</span></div>
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button onClick={(e)=>{e.stopPropagation();copyUrl(item.url);}} className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-[#1A614F] hover:bg-white">{copied===item.url?<CheckCircle size={15} className="text-[#1B9A63]"/>:<LinkIcon size={15}/>}</button>
+                  <button onClick={(e)=>{e.stopPropagation();deleteItem(item.url);}} className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-red-500 hover:bg-white"><span className="font-bold text-[16px] leading-none">×</span></button>
+                </div>
               </div>
-              {/* Type badge */}
-              <div className="absolute top-2 left-2">
-                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-                  style={{ background: item.type === "featured" ? "#FBF1D2" : "#E9FFF3", color: item.type === "featured" ? "#9a6b00" : "#1B9A63" }}>
-                  {item.type === "featured" ? "Featured" : "Content"}
-                </span>
-              </div>
-              {/* Hover actions */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button onClick={(e) => { e.stopPropagation(); copyUrl(item.url); }} title="Copy URL"
-                  className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-[#1A614F] hover:bg-white transition-colors">
-                  {copied === item.url ? <CheckCircle size={15} className="text-[#1B9A63]" /> : <LinkIcon size={15} />}
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); deleteItem(item.url); }} title="Remove from library"
-                  className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-red-500 hover:bg-white transition-colors">
-                  <span className="font-bold text-[16px] leading-none">×</span>
-                </button>
-              </div>
-              {/* Filename */}
-              <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
-                <p className="text-[11px] font-semibold text-[#15302A] truncate">{item.name || "Untitled"}</p>
-                <p className="text-[10px] text-[#9FC1B5]">{formatDate(item.addedAt)}{item.size ? ` · ${formatSize(item.size)}` : ""}</p>
-              </div>
+              {editingUrl===item.url?(
+                <div className="p-2 bg-white border-t border-[#E6E1D3] space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[["name","Filename"],["fileFormat","Format"],["fileSize","Size"]].map(([f,l])=>(
+                      <div key={f}><span className="block text-[9px] font-bold text-[#9FC1B5] uppercase mb-0.5">{l}</span>
+                        <input value={editFields[f]||""} onChange={(e)=>setEditFields((p)=>({...p,[f]:e.target.value}))} className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/></div>
+                    ))}
+                    <div><span className="block text-[9px] font-bold text-[#9FC1B5] uppercase mb-0.5">W × H (px)</span>
+                      <div className="flex gap-1">
+                        <input value={editFields.naturalW||""} onChange={(e)=>setEditFields((p)=>({...p,naturalW:e.target.value}))} placeholder="W" className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/>
+                        <input value={editFields.naturalH||""} onChange={(e)=>setEditFields((p)=>({...p,naturalH:e.target.value}))} placeholder="H" className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5"><button onClick={()=>saveEdit(item.url)} className="flex-1 py-1 rounded text-[10px] font-bold text-white" style={{background:"#1A614F"}}>Save</button>
+                    <button onClick={()=>setEditingUrl(null)} className="flex-1 py-1 rounded text-[10px] font-semibold border border-[#DDD7C7] text-[#5B6B63]">Cancel</button></div>
+                </div>
+              ):(
+                <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-[#15302A] truncate">{item.name||"Untitled"}</p>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {item.fileFormat&&<span className="text-[9px] font-bold px-1 rounded bg-slate-100 text-slate-500">{item.fileFormat}</span>}
+                        {item.fileSize&&<span className="text-[9px] text-[#9FC1B5]">{item.fileSize}</span>}
+                        {(item.naturalW&&item.naturalH)&&<span className="text-[9px] text-[#9FC1B5]">{item.naturalW}×{item.naturalH}px</span>}
+                      </div>
+                      <p className="text-[9px] text-[#C9C9C9] mt-0.5">{formatDate(item.addedAt)}</p>
+                    </div>
+                    <button onClick={()=>openEdit(item)} className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[#9FC1B5] hover:text-[#1A614F] hover:bg-[#EAF4EF]"><Edit3 size={11}/></button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -2266,11 +2278,12 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
   };
 
   const ROLE_CONFIG = {
-    viewer: { label: "Viewer",      color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
-    editor: { label: "Editor",      color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
+    viewer: { label: "View only",   color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
+    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
     admin:  { label: "Admin",       color: "#7c3aed", bg: "#F3F0FF", icon: "🛡️", desc: "Full access to everything" },
   };
 
+  const exportUsersExcel=()=>{const rows=[["ID","Name","Email","Role","Added On"]];users.forEach((u)=>rows.push([u.id,u.name,u.email,u.role,u.addedOn||""]));const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(blob),download:"users.csv"});a.click();URL.revokeObjectURL(a.href);};
   return (
     <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6 space-y-6">
       {/* Header */}
@@ -2278,8 +2291,22 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
         <UsersIcon size={18} className="text-[#1A614F]" />
         <h2 className="text-[18px] font-extrabold text-[#15302A]">Users</h2>
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full ml-1" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{users.length} users</span>
+        <button onClick={exportUsersExcel} disabled={users.length===0} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#DDD7C7] text-[#5B6B63] hover:bg-[#EAF4EF] hover:text-[#1A614F] hover:border-[#1A614F] transition-all disabled:opacity-40"><Upload size={12}/> Export Excel</button>
       </div>
       <p className="text-[13px] text-[#646970] -mt-4">Manage who can access the blog builder and what they can do.</p>
+
+      {/* Role legend */}
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
+          <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px]" style={{ background: cfg.bg, borderColor: cfg.color + "33" }}>
+            <span>{cfg.icon}</span>
+            <div>
+              <div className="font-bold" style={{ color: cfg.color }}>{cfg.label}</div>
+              <div className="text-[10px] text-slate-500">{cfg.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
 
@@ -2312,9 +2339,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
             <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
               className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
-              <option value="viewer">Viewer</option>
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
+              <option value="viewer">👁 View only</option>
+              <option value="editor">✏️ View & Edit</option>
+              <option value="admin">🛡️ Admin</option>
             </select>
           </div>
         </div>
@@ -2394,9 +2421,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
                 <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
                 <select value={editRole} onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
-                  <option value="viewer">Viewer</option>
-                  <option value="editor">Editor</option>
-                  <option value="admin">Admin</option>
+                  <option value="viewer">👁 View only</option>
+                  <option value="editor">✏️ View & Edit</option>
+                  <option value="admin">🛡️ Admin</option>
                 </select>
               </div>
             </div>
@@ -2555,6 +2582,7 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
     r.to?.toLowerCase().includes(query.toLowerCase())
   );
 
+  const exportRedirectsExcel=()=>{const rows=[["From","To","Type","Status","Date"]];redirects.forEach((r)=>rows.push([r.from,r.to,r.type||"301",r.status?"On":"Off",r.date||""]));const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(blob),download:"redirects.csv"});a.click();URL.revokeObjectURL(a.href);};
   const body = (
     <div className={inline ? "space-y-5" : "p-3 space-y-4"}>
       {/* ADD A REDIRECT */}
@@ -2597,9 +2625,9 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
 
       {/* YOUR REDIRECTS */}
       <div>
-        <div className="text-center mb-1">
-          <h3 className="text-[17px] font-extrabold text-[#15302A]">Your redirects</h3>
-          <p className="text-[12px] text-[#646970]">({redirects.length} specific URL redirects)</p>
+        <div className="flex items-center justify-between mb-1">
+          <div><h3 className="text-[17px] font-extrabold text-[#15302A]">Your redirects</h3><p className="text-[12px] text-[#646970]">{redirects.length} specific URL redirects</p></div>
+          <button onClick={exportRedirectsExcel} disabled={redirects.length===0} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#DDD7C7] text-[#5B6B63] hover:bg-[#EAF4EF] hover:text-[#1A614F] hover:border-[#1A614F] transition-all disabled:opacity-40"><Upload size={12}/> Export Excel</button>
         </div>
 
         <div className="flex items-center justify-end mb-2">
