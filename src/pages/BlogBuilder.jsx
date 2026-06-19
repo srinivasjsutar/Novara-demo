@@ -825,10 +825,55 @@ function BlogEditor({ editingBlog, onBack }) {
     // remember caret so the image lands where the user was typing
     const sel = window.getSelection();
     if (sel && sel.rangeCount) savedSelection.current = sel.getRangeAt(0).cloneRange();
+    editingFigureRef.current = null; // new image, not editing existing
     fileInputRef.current?.click();
   };
 
+  // Called when user clicks inside the editor body — detects image/figure clicks
+  const onEditorClick = (e) => {
+    const target = e.target;
+    // Check if clicked element is an img or inside a figure
+    const img = target.tagName === "IMG" ? target : target.closest("figure")?.querySelector("img");
+    const figure = target.closest("figure") || (target.tagName === "IMG" ? target.parentElement : null);
+    if (!img || !figure) return;
+
+    // Highlight selected figure
+    document.querySelectorAll(".wp-editor figure.selected-for-edit").forEach((el) => el.classList.remove("selected-for-edit"));
+    figure.classList.add("selected-for-edit");
+
+    // Extract all stored metadata from the figure/img
+    const src = img.getAttribute("src") || "";
+    if (!src) return;
+    const alt = img.getAttribute("alt") || "";
+    const title = img.getAttribute("title") || "";
+    const width = img.getAttribute("data-width") || img.style.width?.replace("px", "") || "";
+    const height = img.getAttribute("data-height") || img.style.height?.replace("px", "") || "";
+    const alignment = figure.getAttribute("data-alignment") || "center";
+    const videoUrl = figure.getAttribute("data-video-url") || "";
+    const filename = figure.getAttribute("data-filename") || "";
+    const fileFormat = figure.getAttribute("data-format") || "";
+    const fileSize = figure.getAttribute("data-filesize") || "";
+    const caption = figure.querySelector("figcaption")?.textContent?.trim() || "";
+
+    // Detect natural dimensions
+    const tmpImg = new window.Image();
+    tmpImg.onload = () => {
+      const naturalW = String(tmpImg.naturalWidth || "");
+      const naturalH = String(tmpImg.naturalHeight || "");
+      editingFigureRef.current = figure;
+      setPendingImageUrl(src);
+      setContentImageMeta({ alt, title, caption, description: "", videoUrl, width, height, alignment, filename, fileFormat, fileSize, naturalW, naturalH });
+    };
+    tmpImg.onerror = () => {
+      editingFigureRef.current = figure;
+      setPendingImageUrl(src);
+      setContentImageMeta({ alt, title, caption, description: "", videoUrl, width, height, alignment, filename, fileFormat, fileSize, naturalW: "", naturalH: "" });
+    };
+    tmpImg.src = src;
+  };
+
   const imageVideoMapRef = useRef({}); // maps imageUrl → youTubeUrl
+  const editingFigureRef = useRef(null); // ref to the <figure> being re-edited
 
   const handleContentImage = async (file) => {
     if (!file) return;
@@ -900,31 +945,36 @@ function BlogEditor({ editingBlog, onBack }) {
     const body = bodyRef.current;
     if (!body) return;
 
-    // Try to insert at saved caret position; fallback to appending at end
-    const sel = window.getSelection();
-    let inserted = false;
-    if (savedSelection.current) {
-      try {
-        body.focus();
-        sel.removeAllRanges();
-        sel.addRange(savedSelection.current);
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        // Insert spacer first so caret lands after the figure
-        range.insertNode(spacer);
-        range.insertNode(figure);
-        // Move caret after the spacer
-        const newRange = document.createRange();
-        newRange.setStartAfter(spacer);
-        newRange.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-        inserted = true;
-      } catch (_) {}
-    }
-    if (!inserted) {
-      body.appendChild(figure);
-      body.appendChild(spacer);
+    // If editing an existing figure — replace it in-place
+    if (editingFigureRef.current && editingFigureRef.current.parentNode) {
+      editingFigureRef.current.parentNode.replaceChild(figure, editingFigureRef.current);
+      editingFigureRef.current = null;
+      figure.classList.remove("selected-for-edit");
+    } else {
+      // Try to insert at saved caret position; fallback to appending at end
+      const sel = window.getSelection();
+      let inserted = false;
+      if (savedSelection.current) {
+        try {
+          body.focus();
+          sel.removeAllRanges();
+          sel.addRange(savedSelection.current);
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(spacer);
+          range.insertNode(figure);
+          const newRange = document.createRange();
+          newRange.setStartAfter(spacer);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          inserted = true;
+        } catch (_) {}
+      }
+      if (!inserted) {
+        body.appendChild(figure);
+        body.appendChild(spacer);
+      }
     }
 
     setPendingImageUrl(null);
@@ -934,6 +984,9 @@ function BlogEditor({ editingBlog, onBack }) {
   };
 
   const cancelContentImage = () => {
+    editingFigureRef.current = null;
+    // Remove any highlight
+    document.querySelectorAll(".wp-editor figure.selected-for-edit").forEach((el) => el.classList.remove("selected-for-edit"));
     setPendingImageUrl(null);
     setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
   };
@@ -1213,6 +1266,9 @@ function BlogEditor({ editingBlog, onBack }) {
         .wp-editor blockquote { border-left:4px solid #E3A600; background:#FBF6E9; padding:10px 14px; margin:0 0 1em; font-style:italic; color:#475569; border-radius:10px; }
         .wp-editor figure { margin:0 0 1em; }
         .wp-editor figure img { max-width:100%; height:auto; border-radius:14px; display:block; }
+        .wp-editor figure { cursor:pointer; transition:outline 0.15s; }
+        .wp-editor figure:hover { outline:2px dashed #1A614F44; border-radius:16px; }
+        .wp-editor figure.selected-for-edit { outline:2.5px solid #1A614F; border-radius:16px; box-shadow:0 0 0 4px #1A614F22; }
         .wp-editor figcaption { font-size:12px; color:#64748b; padding:6px 2px; }
         .wp-editor table { border-collapse:collapse; width:100%; margin:0 0 1em; }
         .wp-editor th, .wp-editor td { border:1px solid #E6E1D3; padding:8px 12px; text-align:left; }
@@ -1452,6 +1508,7 @@ function BlogEditor({ editingBlog, onBack }) {
                   suppressContentEditableWarning
                   data-placeholder="Start writing your post…"
                   onFocus={onEditorFocus}
+                  onClick={onEditorClick}
                   onKeyUp={(e) => { syncFormatState(e); if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); }}
                   onMouseUp={syncFormatState}
                   onInput={() => { if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML); }}
@@ -1465,7 +1522,7 @@ function BlogEditor({ editingBlog, onBack }) {
               {pendingImageUrl && (
                 <div className="meta-box mt-4">
                   <div className="meta-box-head">
-                    <span className="meta-box-title flex items-center gap-1.5"><ImageIcon size={13} /> Image details</span>
+                    <span className="meta-box-title flex items-center gap-1.5"><ImageIcon size={13} /> {editingFigureRef.current ? "Edit image" : "Image details"}</span>
                   </div>
                   <div className="p-4 space-y-3">
                     {/* Live preview with applied size */}
@@ -1618,7 +1675,7 @@ function BlogEditor({ editingBlog, onBack }) {
                     {/* Actions */}
                     <div className="flex gap-2 pt-1">
                       <button onClick={insertContentImage} className="wp-primary flex items-center gap-1.5">
-                        <ImageIcon size={13} /> Insert into post
+                        <ImageIcon size={13} /> {editingFigureRef.current ? "Update image" : "Insert into post"}
                       </button>
                       <button onClick={cancelContentImage} className="wp-secondary">
                         Cancel
