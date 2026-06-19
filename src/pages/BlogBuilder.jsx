@@ -2073,7 +2073,7 @@ function MediaLibraryPage({ meta, bodyRef }) {
       </div>
 
       {/* Grid */}
-      {mediaLibrary.length === 0 ? (
+      {enriched.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#F4F1E8" }}>
             <MediaIcon size={28} className="text-[#C9C9C9]" />
