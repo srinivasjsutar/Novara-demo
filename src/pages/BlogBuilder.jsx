@@ -1696,16 +1696,16 @@ function BlogEditor({ editingBlog, onBack }) {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-semibold text-[#5B6B63]">Meta title (&lt;title&gt;)</label>
-                        <span className={`text-[11px] font-semibold ${meta.title.length > 60 ? "text-red-500" : meta.title.length > 50 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.title.length}/60</span>
+                        <span className={`text-[11px] font-semibold ${meta.title.length > 60 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.title.length} chars</span>
                       </div>
-                      <input maxLength={60} value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" />
+                      <input value={meta.title} onChange={(e) => setMeta((p) => ({ ...p, title: e.target.value }))} placeholder="Project Name | Location" className="wp-input" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-semibold text-[#5B6B63]">Meta description</label>
-                        <span className={`text-[11px] font-semibold ${meta.description.length > 160 ? "text-red-500" : meta.description.length > 140 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.description.length}/160</span>
+                        <span className={`text-[11px] font-semibold ${meta.description.length > 160 ? "text-[#E3A600]" : "text-[#9FC1B5]"}`}>{meta.description.length} chars</span>
                       </div>
-                      <textarea rows={3} maxLength={160} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" />
+                      <textarea rows={3} value={meta.description} onChange={(e) => setMeta((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description for search results…" className="wp-input resize-none" />
                     </div>
                     <Field label="Focus keyword(s)"><input value={meta.keywords} onChange={(e) => setMeta((p) => ({ ...p, keywords: e.target.value }))} placeholder="farmland near bangalore" className="wp-input" /></Field>
                     <div className="grid grid-cols-2 gap-2">
