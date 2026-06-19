@@ -171,7 +171,10 @@ const htmlToSections = (html = "") => {
       const alignment = (tag === "figure" ? node.getAttribute("data-alignment") : null) || "center";
       const imgWidth = imgEl?.getAttribute("data-width") || imgEl?.style?.width?.replace("px","") || "";
       const imgHeight = imgEl?.getAttribute("data-height") || imgEl?.style?.height?.replace("px","") || "";
-      if (src) out.push({ type: "image", src, alt, title, caption: cap, videoUrl, alignment, imgWidth, imgHeight });
+      const filename = (tag === "figure" ? node.getAttribute("data-filename") : null) || "";
+      const fileFormat = (tag === "figure" ? node.getAttribute("data-format") : null) || "";
+      const fileSize = (tag === "figure" ? node.getAttribute("data-filesize") : null) || "";
+      if (src) out.push({ type: "image", src, alt, title, caption: cap, videoUrl, alignment, imgWidth, imgHeight, filename, fileFormat, fileSize });
       return;
     }
     if (tag === "table") {
@@ -240,7 +243,19 @@ function PreviewSection({ s, usedH3, onPlayVideo }) {
             )}
           </div>
         ) : null}
-        {s.caption && <figcaption className="px-4 py-3 text-[12px] text-slate-500">{s.caption}</figcaption>}
+        {(s.caption || s.filename || s.fileFormat || s.fileSize) && (
+          <figcaption className="px-4 py-2 bg-white border-t border-slate-100">
+            {s.caption && <p className="text-[12px] text-slate-600 italic">{s.caption}</p>}
+            {(s.filename || s.fileFormat || s.fileSize) && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {s.filename && <span className="text-[10px] text-slate-400 font-mono">{s.filename}</span>}
+                {s.fileFormat && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{s.fileFormat}</span>}
+                {s.fileSize && <span className="text-[10px] text-slate-400">{s.fileSize}</span>}
+                {s.imgWidth && s.imgHeight && <span className="text-[10px] text-slate-400">{s.imgWidth}×{s.imgHeight}px</span>}
+              </div>
+            )}
+          </figcaption>
+        )}
       </figure>
     );
   }
@@ -821,9 +836,26 @@ function BlogEditor({ editingBlog, onBack }) {
     try {
       const url = await compressAndUpload(file, { maxW: 1200, quality: 0.8 });
       addToMediaLib({ url, type: "content", name: file.name, addedAt: Date.now(), size: file.size });
-      // Show meta panel instead of window.prompt
+      // Detect natural dimensions
+      const dims = await new Promise((resolve) => {
+        const tmp = new window.Image();
+        tmp.onload = () => resolve({ w: tmp.naturalWidth, h: tmp.naturalHeight });
+        tmp.onerror = () => resolve({ w: "", h: "" });
+        tmp.src = url;
+      });
+      const kb = file.size ? (file.size / 1024).toFixed(1) + " KB" : "";
+      const fmt = (file.type || "").replace("image/", "").toUpperCase() || file.name.split(".").pop().toUpperCase();
       setPendingImageUrl(url);
-      setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
+      setContentImageMeta({
+        alt: "", title: "", caption: "", description: "", videoUrl: "",
+        width: String(dims.w || ""), height: String(dims.h || ""),
+        alignment: "center",
+        filename: file.name,
+        fileFormat: fmt,
+        fileSize: kb,
+        naturalW: String(dims.w || ""),
+        naturalH: String(dims.h || ""),
+      });
     } catch (e) { alert("Image upload failed: " + e.message); }
     finally { setImageUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
@@ -848,6 +880,10 @@ function BlogEditor({ editingBlog, onBack }) {
     if (title) img.title = title;
     if (width) img.setAttribute("data-width", width);
     if (height) img.setAttribute("data-height", height);
+    const { filename, fileFormat, fileSize } = contentImageMeta;
+    if (filename) figure.setAttribute("data-filename", filename);
+    if (fileFormat) figure.setAttribute("data-format", fileFormat);
+    if (fileSize) figure.setAttribute("data-filesize", fileSize);
     // Apply inline dimensions
     if (width) img.style.width = width + "px";
     if (height) img.style.height = height + "px";
@@ -892,14 +928,14 @@ function BlogEditor({ editingBlog, onBack }) {
     }
 
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
     // Snapshot immediately — direct DOM read is synchronous
     if (bodyRef.current) setBodySnapshot(bodyRef.current.innerHTML);
   };
 
   const cancelContentImage = () => {
     setPendingImageUrl(null);
-    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center" });
+    setContentImageMeta({ alt: "", title: "", caption: "", description: "", videoUrl: "", width: "", height: "", alignment: "center", filename: "", fileFormat: "", fileSize: "", naturalW: "", naturalH: "" });
   };
 
   const handleHeroImage = async (file) => {
@@ -1150,7 +1186,7 @@ function BlogEditor({ editingBlog, onBack }) {
 
   // ─────────────────────────────────────────────────────────────────────────
   const navItems = [
-    { id: "blog",      label: "Home",      Icon: Home,       onClick: () => setActiveNav("blog") },
+    { id: "home_blank", label: "Home",      Icon: Home,       onClick: () => setActiveNav("home_blank") },
     { id: "home",      label: "Blogs",     Icon: FileText,   onClick: onBack },
     { id: "media",     label: "Media",     Icon: MediaIcon,  onClick: () => setActiveNav("media") },
     { id: "redirects", label: "Redirects", Icon: ArrowRight, onClick: () => setActiveNav("redirects") },
@@ -1327,7 +1363,9 @@ function BlogEditor({ editingBlog, onBack }) {
 
           <div className="flex-1 flex gap-6 px-6 py-7 items-start" style={{ background: "#F7F4EB" }}>
             {/* CONTENT COLUMN */}
-            {activeNav === "media" ? (
+            {activeNav === "home_blank" ? (
+              <div className="flex-1 min-w-0" />
+            ) : activeNav === "media" ? (
               <div className="flex-1 min-w-0">
                 <MediaLibraryPage mediaLibrary={mediaLibrary} setMediaLibrary={setMediaLibrary} MEDIA_KEY={MEDIA_KEY} />
               </div>
@@ -1445,7 +1483,45 @@ function BlogEditor({ editingBlog, onBack }) {
                       />
                     </div>
 
-                    {/* Size & Alignment */}
+                    {/* File info strip */}
+                    <div className="rounded-xl border border-[#E6E1D3] bg-[#FAFAF8] p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-[#5B6B63] uppercase tracking-wider">File information</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Filename */}
+                        <div>
+                          <span className="block text-[10px] font-semibold text-[#9FC1B5] mb-0.5">Filename</span>
+                          <input value={contentImageMeta.filename}
+                            onChange={(e) => setContentImageMeta((p) => ({ ...p, filename: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white"
+                          />
+                        </div>
+                        {/* Format */}
+                        <div>
+                          <span className="block text-[10px] font-semibold text-[#9FC1B5] mb-0.5">Format</span>
+                          <input value={contentImageMeta.fileFormat}
+                            onChange={(e) => setContentImageMeta((p) => ({ ...p, fileFormat: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white"
+                          />
+                        </div>
+                        {/* File size */}
+                        <div>
+                          <span className="block text-[10px] font-semibold text-[#9FC1B5] mb-0.5">File size</span>
+                          <input value={contentImageMeta.fileSize}
+                            onChange={(e) => setContentImageMeta((p) => ({ ...p, fileSize: e.target.value }))}
+                            className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white"
+                          />
+                        </div>
+                        {/* Dimensions (naturalW × naturalH) read-only info */}
+                        <div>
+                          <span className="block text-[10px] font-semibold text-[#9FC1B5] mb-0.5">Original dimensions</span>
+                          <div className="px-2 py-1 text-[11px] font-mono rounded border border-[#E6E1D3] bg-[#F4F1E8] text-[#5B6B63]">
+                            {contentImageMeta.naturalW && contentImageMeta.naturalH ? `${contentImageMeta.naturalW} × ${contentImageMeta.naturalH} px` : "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Width / Height / Alignment */}
                     <div className="grid grid-cols-3 gap-2">
                       <label className="block">
                         <span className="block mb-1 text-[11px] font-semibold text-[#5B6B63]">Width (px)</span>
@@ -1746,7 +1822,7 @@ function BlogEditor({ editingBlog, onBack }) {
 
             {/* RIGHT SIDEBAR — meta boxes */}
             <div className="w-[280px] shrink-0">
-              {activeNav !== "redirects" && activeNav !== "users" && activeNav !== "media" && (<>
+              {activeNav !== "redirects" && activeNav !== "users" && activeNav !== "media" && activeNav !== "home_blank" && (<>
               {/* PUBLISH BOX (matches reference) */}
               <div className="meta-box">
                 <div className="meta-box-head">
