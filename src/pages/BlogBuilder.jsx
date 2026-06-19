@@ -2172,35 +2172,38 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
 const USERS_FILE = "src/data/users.js";
 
 function UsersPanel({ ghToken, ghRepo, ghBranch }) {
-  const [users, setUsers]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [busy, setBusy]         = useState(false);
-  const [banner, setBanner]     = useState(null);
+  const [users, setUsers]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy]       = useState(false);
+  const [banner, setBanner]   = useState(null);
 
-  // Add user form
-  const [newEmail, setNewEmail]     = useState("");
-  const [newName, setNewName]       = useState("");
+  // Add-user form
+  const [newEmail, setNewEmail]       = useState("");
+  const [newName, setNewName]         = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole]       = useState("viewer");
+  const [newRole, setNewRole]         = useState("viewer");
+  const [showNewPw, setShowNewPw]     = useState(false);
 
-  // Edit
-  const [editingId, setEditingId]   = useState(null);
-  const [editRole, setEditRole]     = useState("viewer");
-  const [editName, setEditName]     = useState("");
+  // Edit popup
+  const [editUser, setEditUser]       = useState(null); // the user object being edited
+  const [editName, setEditName]       = useState("");
+  const [editEmail, setEditEmail]     = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editRole, setEditRole]       = useState("viewer");
+  const [showEditPw, setShowEditPw]   = useState(false);
 
   const ghHeaders = { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" };
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+      const res = await fetch(`https://api.github.com/repos/${ghRepo}/contents/src/data/users.js?ref=${ghBranch}&t=${Date.now()}`,
         { headers: ghHeaders, cache: "no-store" });
       if (res.status === 404) { setUsers([]); setLoading(false); return; }
       if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
-      const fileData = await res.json();
-      const binary = atob(fileData.content.replace(/\n/g, ""));
-      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-      const text = new TextDecoder("utf-8").decode(bytes);
+      const fd = await res.json();
+      const binary = atob(fd.content.replace(/\n/g, ""));
+      const text = new TextDecoder("utf-8").decode(Uint8Array.from(binary, (ch) => ch.charCodeAt(0)));
       const stripped = text.replace(/^[\s\S]*?export\s+const\s+USERS\s*=\s*/, "").replace(/;?\s*$/, "").trim();
       // eslint-disable-next-line no-new-func
       const arr = new Function(`return ${stripped}`)();
@@ -2211,23 +2214,21 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
 
   useEffect(() => { fetchUsers(); /* eslint-disable-next-line */ }, []);
 
-  const commitUsers = async (nextArr, message) => {
+  const commitUsers = async (nextArr, msg) => {
     setBusy(true); setBanner(null);
     try {
-      let sha = undefined;
-      const head = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}?ref=${ghBranch}&t=${Date.now()}`,
+      let sha;
+      const head = await fetch(`https://api.github.com/repos/${ghRepo}/contents/src/data/users.js?ref=${ghBranch}&t=${Date.now()}`,
         { headers: ghHeaders, cache: "no-store" });
       if (head.ok) { const d = await head.json(); sha = d.sha; }
-
       const entriesStr = nextArr.map((u) => "  " + JSON.stringify(u, null, 2).replace(/\n/g, "\n  ")).join(",\n");
-      const newContent = `export const USERS = [\n${entriesStr}\n];\n`;
-
-      const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${USERS_FILE}`, {
+      const content = `export const USERS = [\n${entriesStr}\n];\n`;
+      const putRes = await fetch(`https://api.github.com/repos/${ghRepo}/contents/src/data/users.js`, {
         method: "PUT",
         headers: { ...ghHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ message, content: btoa(unescape(encodeURIComponent(newContent))), branch: ghBranch, ...(sha ? { sha } : {}) }),
+        body: JSON.stringify({ message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: ghBranch, ...(sha ? { sha } : {}) }),
       });
-      if (!putRes.ok) { const err = await putRes.json().catch(() => ({})); throw new Error(err.message || `Commit failed`); }
+      if (!putRes.ok) { const err = await putRes.json().catch(() => ({})); throw new Error(err.message || "Commit failed"); }
       setUsers(nextArr);
       setBanner({ type: "ok", msg: "Saved!" });
       setTimeout(() => setBanner(null), 2500);
@@ -2238,9 +2239,9 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
 
   const addUser = async () => {
     if (!newEmail.trim() || !newName.trim() || !newPassword.trim()) { setBanner({ type: "err", msg: "All fields are required" }); return; }
-    if (users.find((u) => u.email === newEmail.trim())) { setBanner({ type: "err", msg: "A user with this email already exists" }); return; }
-    const newUser = { id: Date.now(), email: newEmail.trim(), name: newName.trim(), password: newPassword.trim(), role: newRole, addedOn: new Date().toLocaleDateString("en-GB") };
-    const ok = await commitUsers([...users, newUser], `add user: ${newEmail.trim()} (${newRole})`);
+    if (users.find((u) => u.email === newEmail.trim())) { setBanner({ type: "err", msg: "Email already exists" }); return; }
+    const nu = { id: Date.now(), email: newEmail.trim(), name: newName.trim(), password: newPassword.trim(), role: newRole, addedOn: new Date().toLocaleDateString("en-GB") };
+    const ok = await commitUsers([...users, nu], `add user: ${newEmail.trim()} (${newRole})`);
     if (ok) { setNewEmail(""); setNewName(""); setNewPassword(""); setNewRole("viewer"); }
   };
 
@@ -2249,20 +2250,31 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
     await commitUsers(users.filter((x) => x.id !== u.id), `remove user: ${u.email}`);
   };
 
-  const saveEdit = async (u) => {
-    const next = users.map((x) => x.id === u.id ? { ...x, role: editRole, name: editName } : x);
-    const ok = await commitUsers(next, `update user: ${u.email} role=${editRole}`);
-    if (ok) setEditingId(null);
+  const openEdit = (u) => {
+    setEditUser(u); setEditName(u.name); setEditEmail(u.email);
+    setEditPassword(u.password || ""); setEditRole(u.role || "viewer"); setShowEditPw(false);
+  };
+
+  const saveEdit = async () => {
+    if (!editEmail.trim() || !editName.trim()) { setBanner({ type: "err", msg: "Name and email are required" }); return; }
+    const next = users.map((x) => x.id === editUser.id
+      ? { ...x, name: editName.trim(), email: editEmail.trim(), password: editPassword.trim() || x.password, role: editRole }
+      : x
+    );
+    const ok = await commitUsers(next, `update user: ${editUser.email}`);
+    if (ok) setEditUser(null);
   };
 
   const ROLE_CONFIG = {
-    viewer: { label: "View only", color: "#1A614F", bg: "#E9FFF3", icon: "👁" },
-    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️" },
+    viewer: { label: "View only",   color: "#1A614F", bg: "#E9FFF3", icon: "👁",  desc: "Can read blogs only" },
+    editor: { label: "View & Edit", color: "#9a6b00", bg: "#FBF1D2", icon: "✏️", desc: "Can create & edit blogs" },
+    admin:  { label: "Admin",       color: "#7c3aed", bg: "#F3F0FF", icon: "🛡️", desc: "Full access to everything" },
   };
 
   return (
     <div className="bg-white border border-[#ECE6D6] rounded-2xl shadow-sm p-6 space-y-6">
-      <div className="flex items-center gap-2 mb-2">
+      {/* Header */}
+      <div className="flex items-center gap-2">
         <UsersIcon size={18} className="text-[#1A614F]" />
         <h2 className="text-[18px] font-extrabold text-[#15302A]">Users</h2>
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full ml-1" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{users.length} users</span>
@@ -2270,13 +2282,13 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
       <p className="text-[13px] text-[#646970] -mt-4">Manage who can access the blog builder and what they can do.</p>
 
       {/* Role legend */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
           <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px]" style={{ background: cfg.bg, borderColor: cfg.color + "33" }}>
             <span>{cfg.icon}</span>
             <div>
               <div className="font-bold" style={{ color: cfg.color }}>{cfg.label}</div>
-              <div className="text-[10px] text-slate-500">{role === "viewer" ? "Can read blogs only" : "Can read + create + edit blogs"}</div>
+              <div className="text-[10px] text-slate-500">{cfg.desc}</div>
             </div>
           </div>
         ))}
@@ -2290,21 +2302,32 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Name</label>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name"
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Email</label>
-            <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@email.com" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+            <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@email.com"
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Password</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+            <div className="relative">
+              <input type={showNewPw ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••"
+                className="w-full px-3 py-2 pr-9 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]" />
+              <button type="button" onClick={() => setShowNewPw((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9FC1B5] hover:text-[#1A614F] text-[11px]">
+                {showNewPw ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
-            <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
+            <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#C9DED4] bg-white focus:outline-none focus:border-[#1A614F]">
               <option value="viewer">👁 View only</option>
               <option value="editor">✏️ View & Edit</option>
+              <option value="admin">🛡️ Admin</option>
             </select>
           </div>
         </div>
@@ -2322,40 +2345,24 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
         <div className="text-center py-8 text-[13px] text-[#646970]">No users yet. Add one above.</div>
       ) : (
         <div className="rounded-xl border border-[#E6E1D3] overflow-hidden">
-          <div className="grid grid-cols-[1fr_1fr_120px_90px_80px] gap-2 px-4 py-2 bg-[#F4F1E8] text-[11px] font-bold text-[#5B6B63] uppercase tracking-wide">
-            <span>Name</span><span>Email</span><span>Role</span><span>Added</span><span>Actions</span>
+          <div className="grid grid-cols-[1fr_1fr_80px_120px_90px_80px] gap-2 px-4 py-2 bg-[#F4F1E8] text-[11px] font-bold text-[#5B6B63] uppercase tracking-wide">
+            <span>Name</span><span>Email</span><span>Password</span><span>Role</span><span>Added</span><span>Actions</span>
           </div>
           <div className="divide-y divide-[#EFEADD]">
             {users.map((u) => {
-              const isEditing = editingId === u.id;
               const roleCfg = ROLE_CONFIG[u.role] || ROLE_CONFIG.viewer;
               return (
-                <div key={u.id} className="grid grid-cols-[1fr_1fr_120px_90px_80px] gap-2 px-4 py-3 items-center bg-white text-[13px]">
-                  {isEditing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} className="px-2 py-1 text-[12px] rounded border border-[#1A614F] focus:outline-none" /> : <span className="font-semibold text-[#15302A]">{u.name}</span>}
+                <div key={u.id} className="grid grid-cols-[1fr_1fr_80px_120px_90px_80px] gap-2 px-4 py-3 items-center bg-white text-[13px]">
+                  <span className="font-semibold text-[#15302A] truncate">{u.name}</span>
                   <span className="text-[#646970] truncate">{u.email}</span>
-                  {isEditing ? (
-                    <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="px-2 py-1 text-[12px] rounded border border-[#1A614F] focus:outline-none">
-                      <option value="viewer">👁 View only</option>
-                      <option value="editor">✏️ View & Edit</option>
-                    </select>
-                  ) : (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: roleCfg.bg, color: roleCfg.color }}>
-                      {roleCfg.icon} {roleCfg.label}
-                    </span>
-                  )}
+                  <span className="font-mono text-[12px] text-[#9FC1B5] tracking-widest">••••••</span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 w-fit" style={{ background: roleCfg.bg, color: roleCfg.color }}>
+                    {roleCfg.icon} {roleCfg.label}
+                  </span>
                   <span className="text-[11px] text-[#646970]">{u.addedOn || "—"}</span>
                   <div className="flex items-center gap-2">
-                    {!isEditing ? (
-                      <>
-                        <button onClick={() => { setEditingId(u.id); setEditRole(u.role); setEditName(u.name); }} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
-                        <button onClick={() => deleteUser(u)} disabled={busy} title="Remove" className="text-red-500 hover:opacity-70 font-bold text-[16px] leading-none">×</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => saveEdit(u)} disabled={busy} title="Save" className="text-[#1B9A63] hover:opacity-70"><CheckCircle size={15} /></button>
-                        <button onClick={() => setEditingId(null)} title="Cancel" className="text-[#b32d2e] hover:opacity-70 font-bold text-[16px] leading-none">×</button>
-                      </>
-                    )}
+                    <button onClick={() => openEdit(u)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
+                    <button onClick={() => deleteUser(u)} disabled={busy} title="Remove" className="text-red-500 hover:opacity-70 font-bold text-[16px] leading-none">×</button>
                   </div>
                 </div>
               );
@@ -2363,9 +2370,70 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
           </div>
         </div>
       )}
+
+      {/* ── Edit User Popup Modal ── */}
+      {editUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setEditUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[17px] font-extrabold text-[#15302A] flex items-center gap-2"><Edit3 size={16} className="text-[#1A614F]" /> Edit User</h3>
+              <button onClick={() => setEditUser(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 font-bold text-lg">×</button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Name</label>
+                <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Email</label>
+                <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Password <span className="font-normal text-[#9FC1B5]">(leave blank to keep current)</span></label>
+                <div className="relative">
+                  <input type={showEditPw ? "text" : "password"} value={editPassword} onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder={showEditPw ? "Enter new password" : "••••••••"}
+                    className="w-full px-3 py-2 pr-16 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
+                  <button type="button" onClick={() => setShowEditPw((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[#1A614F] hover:opacity-70">
+                    {showEditPw ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Role</label>
+                <select value={editRole} onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
+                  <option value="viewer">👁 View only</option>
+                  <option value="editor">✏️ View & Edit</option>
+                  <option value="admin">🛡️ Admin</option>
+                </select>
+              </div>
+            </div>
+
+            {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={saveEdit} disabled={busy}
+                className="flex-1 py-2.5 rounded-xl text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{ background: "#1A614F" }}>
+                {busy ? <><Loader size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Save changes</>}
+              </button>
+              <button onClick={() => setEditUser(null)} className="px-4 py-2.5 rounded-xl border border-[#DDD7C7] text-[#5B6B63] font-semibold text-[13px] hover:bg-[#F4F1E8] transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+
 
 // --- Redirects Box (Ultimate Redirect style manager) -----------------------
 function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
@@ -2387,6 +2455,8 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
   const [editFrom, setEditFrom]   = useState("");
   const [editTo, setEditTo]       = useState("");
   const [editType, setEditType]   = useState("301");
+  // Popup edit modal
+  const [editPopup, setEditPopup] = useState(null); // the redirect item being edited in popup
 
   const [query, setQuery] = useState("");
 
@@ -2479,12 +2549,18 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
     await commitRedirects(next, `delete redirect ${item.from}`);
   };
 
-  const startEdit = (item) => { setEditingId(item.id); setEditFrom(item.from); setEditTo(item.to); setEditType(item.type || "301"); };
-  const cancelEdit = () => { setEditingId(null); };
+  const startEdit = (item) => {
+    setEditPopup(item);
+    setEditFrom(item.from);
+    setEditTo(item.to);
+    setEditType(item.type || "301");
+  };
+  const cancelEdit = () => { setEditingId(null); setEditPopup(null); };
   const saveEdit = async (item) => {
+    if (!editFrom.trim() || !editTo.trim()) { setBanner({ type: "err", msg: "Both URLs are required" }); return; }
     const next = redirects.map((r) => r.id === item.id ? { ...r, from: editFrom.trim(), to: editTo.trim(), type: editType } : r);
     const ok = await commitRedirects(next, `edit redirect ${item.from}`);
-    if (ok) setEditingId(null);
+    if (ok) { setEditingId(null); setEditPopup(null); }
   };
 
   const filtered = redirects.filter((r) =>
@@ -2569,40 +2645,17 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
                       <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all" style={{ left: item.status ? "22px" : "2px" }} />
                     </button>
                     {/* from */}
-                    {!isEditing ? (
-                      <span className="font-mono text-[11px] text-[#15302A] truncate" title={item.from}>{item.from}</span>
-                    ) : (
-                      <input value={editFrom} onChange={(e) => setEditFrom(e.target.value)} className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#1A614F] focus:outline-none" />
-                    )}
+                    <span className="font-mono text-[11px] text-[#15302A] truncate" title={item.from}>{item.from}</span>
                     {/* to */}
-                    {!isEditing ? (
-                      <span className="font-mono text-[11px] text-[#1A614F] truncate" title={item.to}>{item.to}</span>
-                    ) : (
-                      <input value={editTo} onChange={(e) => setEditTo(e.target.value)} className="w-full px-2 py-1 text-[11px] font-mono rounded border border-[#1A614F] focus:outline-none" />
-                    )}
+                    <span className="font-mono text-[11px] text-[#1A614F] truncate" title={item.to}>{item.to}</span>
                     {/* date */}
                     <span className="text-[11px] text-[#646970]">{item.date}</span>
                     {/* type */}
-                    {!isEditing ? (
-                      <span className="text-[11px] font-bold text-[#15302A]">{item.type || "301"}</span>
-                    ) : (
-                      <select value={editType} onChange={(e) => setEditType(e.target.value)} className="px-1 py-1 text-[11px] rounded border border-[#1A614F] focus:outline-none">
-                        <option value="301">301</option><option value="302">302</option><option value="307">307</option>
-                      </select>
-                    )}
+                    <span className="text-[11px] font-bold text-[#15302A]">{item.type || "301"}</span>
                     {/* actions */}
                     <div className="flex items-center gap-1.5">
-                      {!isEditing ? (
-                        <>
-                          <button onClick={() => startEdit(item)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
-                          <button onClick={() => deleteRedirect(item)} disabled={busy} title="Delete" className="text-red-500 hover:opacity-70 font-bold text-[14px] leading-none">×</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => saveEdit(item)} disabled={busy} title="Save" className="text-[#1B9A63] hover:opacity-70"><CheckCircle size={15} /></button>
-                          <button onClick={cancelEdit} title="Cancel" className="text-[#b32d2e] hover:opacity-70 font-bold text-[14px] leading-none">×</button>
-                        </>
-                      )}
+                      <button onClick={() => startEdit(item)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
+                      <button onClick={() => deleteRedirect(item)} disabled={busy} title="Delete" className="text-red-500 hover:opacity-70 font-bold text-[14px] leading-none">×</button>
                     </div>
                   </div>
                 );
@@ -2617,7 +2670,50 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
     </div>
   );
 
-  if (inline) return body;
+  // ── Edit Redirect Popup ──────────────────────────────────────────────────────
+  const editPopupModal = editPopup ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setEditPopup(null)}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[17px] font-extrabold text-[#15302A] flex items-center gap-2"><Edit3 size={16} className="text-[#1A614F]" /> Edit Redirect</h3>
+          <button onClick={() => setEditPopup(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 font-bold text-lg">×</button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Redirect from</label>
+            <input autoFocus value={editFrom} onChange={(e) => setEditFrom(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] font-mono rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div className="flex items-center justify-center"><ArrowRight size={18} className="text-[#1A614F]" /></div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Redirect to</label>
+            <input value={editTo} onChange={(e) => setEditTo(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] font-mono rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#5B6B63] mb-1">Type</label>
+            <select value={editType} onChange={(e) => setEditType(e.target.value)}
+              className="w-full px-3 py-2 text-[13px] rounded-lg border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F] bg-white">
+              <option value="301">301 — Permanent</option>
+              <option value="302">302 — Found</option>
+              <option value="307">307 — Temporary</option>
+            </select>
+          </div>
+        </div>
+        {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => saveEdit(editPopup)} disabled={busy}
+            className="flex-1 py-2.5 rounded-xl text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ background: "#1A614F" }}>
+            {busy ? <><Loader size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Save redirect</>}
+          </button>
+          <button onClick={() => setEditPopup(null)} className="px-4 py-2.5 rounded-xl border border-[#DDD7C7] text-[#5B6B63] font-semibold text-[13px] hover:bg-[#F4F1E8] transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (inline) return <>{body}{editPopupModal}</>;
 
   return (
     <div className="meta-box">
@@ -2625,6 +2721,7 @@ function RedirectsBox({ ghToken, ghRepo, ghBranch, inline = false }) {
         <span className="meta-box-title flex items-center gap-1.5"><LinkIcon size={13} /> Redirects</span>
       </button>
       {body}
+      {editPopupModal}
     </div>
   );
 }
