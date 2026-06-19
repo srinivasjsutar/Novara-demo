@@ -243,19 +243,7 @@ function PreviewSection({ s, usedH3, onPlayVideo }) {
             )}
           </div>
         ) : null}
-        {(s.caption || s.filename || s.fileFormat || s.fileSize) && (
-          <figcaption className="px-4 py-2 bg-white border-t border-slate-100">
-            {s.caption && <p className="text-[12px] text-slate-600 italic">{s.caption}</p>}
-            {(s.filename || s.fileFormat || s.fileSize) && (
-              <div className="flex flex-wrap gap-2 mt-1">
-                {s.filename && <span className="text-[10px] text-slate-400 font-mono">{s.filename}</span>}
-                {s.fileFormat && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{s.fileFormat}</span>}
-                {s.fileSize && <span className="text-[10px] text-slate-400">{s.fileSize}</span>}
-                {s.imgWidth && s.imgHeight && <span className="text-[10px] text-slate-400">{s.imgWidth}×{s.imgHeight}px</span>}
-              </div>
-            )}
-          </figcaption>
-        )}
+
       </figure>
     );
   }
@@ -1994,77 +1982,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
   const [filter, setFilter]         = useState("all");
   const [copied, setCopied]         = useState(null);
   const [preview, setPreview]       = useState(null);
-  const [editingUrl, setEditingUrl] = useState(null);
-  const [editFields, setEditFields] = useState({});
-  const [loadingMeta, setLoadingMeta] = useState(false);
-
-  // Merge BLOGS images into the media library (auto-detect on mount)
-  useEffect(() => {
-    setLoadingMeta(true);
-    const existingUrls = new Set(mediaLibrary.map((m) => m.url));
-    const blogImages = [];
-    BLOGS.forEach((blog) => {
-      const url = blog.heroImage || blog.image || blog.coverImage;
-      if (url && !existingUrls.has(url)) {
-        // Detect file info from URL
-        const parts = url.split("/");
-        const raw = parts[parts.length - 1] || "";
-        const filename = raw.split("?")[0];
-        const ext = filename.split(".").pop().toUpperCase();
-        blogImages.push({
-          url,
-          type: "featured",
-          name: blog.title || filename,
-          fileFormat: ext || "WEBP",
-          fileSize: "",
-          naturalW: "",
-          naturalH: "",
-          addedAt: null,
-          blogTitle: blog.title,
-          blogSlug: blog.slug,
-        });
-        existingUrls.add(url);
-      }
-    });
-    if (blogImages.length > 0) {
-      // Detect natural dimensions for each blog image
-      let resolved = 0;
-      blogImages.forEach((entry) => {
-        const img = new window.Image();
-        img.onload = () => {
-          entry.naturalW = String(img.naturalWidth);
-          entry.naturalH = String(img.naturalHeight);
-          resolved++;
-          if (resolved === blogImages.length) {
-            setMediaLibrary((prev) => {
-              const combined = [...prev, ...blogImages];
-              try { localStorage.setItem(MEDIA_KEY, JSON.stringify(combined)); } catch (_) {}
-              return combined;
-            });
-            setLoadingMeta(false);
-          }
-        };
-        img.onerror = () => {
-          resolved++;
-          if (resolved === blogImages.length) {
-            setMediaLibrary((prev) => {
-              const combined = [...prev, ...blogImages];
-              try { localStorage.setItem(MEDIA_KEY, JSON.stringify(combined)); } catch (_) {}
-              return combined;
-            });
-            setLoadingMeta(false);
-          }
-        };
-        img.src = entry.url;
-      });
-    } else {
-      setLoadingMeta(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const openEdit  = (item) => { setEditingUrl(item.url); setEditFields({ name: item.name||"", fileFormat: item.fileFormat||"", fileSize: item.fileSize||"", naturalW: item.naturalW||"", naturalH: item.naturalH||"" }); };
-  const saveEdit  = (url)  => { setMediaLibrary((prev) => { const next = prev.map((m) => m.url === url ? { ...m, ...editFields } : m); try { localStorage.setItem(MEDIA_KEY, JSON.stringify(next)); } catch (_) {} return next; }); setEditingUrl(null); setEditFields({}); };
+  const [viewingItem, setViewingItem] = useState(null);
 
   const filtered = mediaLibrary.filter((m) => {
     const matchQ = !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase());
@@ -2126,11 +2044,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
       </div>
 
       {/* Grid */}
-      {loadingMeta ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-[#646970]">
-          <Loader size={16} className="animate-spin text-[#1A614F]" /> Fetching images from blogs…
-        </div>
-      ) : mediaLibrary.length === 0 ? (
+      {mediaLibrary.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#F4F1E8" }}>
             <MediaIcon size={28} className="text-[#C9C9C9]" />
@@ -2152,39 +2066,20 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
                   <button onClick={(e)=>{e.stopPropagation();deleteItem(item.url);}} className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-red-500 hover:bg-white"><span className="font-bold text-[16px] leading-none">×</span></button>
                 </div>
               </div>
-              {editingUrl===item.url?(
-                <div className="p-2 bg-white border-t border-[#E6E1D3] space-y-1.5">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[["name","Filename"],["fileFormat","Format"],["fileSize","Size"]].map(([f,l])=>(
-                      <div key={f}><span className="block text-[9px] font-bold text-[#9FC1B5] uppercase mb-0.5">{l}</span>
-                        <input value={editFields[f]||""} onChange={(e)=>setEditFields((p)=>({...p,[f]:e.target.value}))} className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/></div>
-                    ))}
-                    <div><span className="block text-[9px] font-bold text-[#9FC1B5] uppercase mb-0.5">W × H (px)</span>
-                      <div className="flex gap-1">
-                        <input value={editFields.naturalW||""} onChange={(e)=>setEditFields((p)=>({...p,naturalW:e.target.value}))} placeholder="W" className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/>
-                        <input value={editFields.naturalH||""} onChange={(e)=>setEditFields((p)=>({...p,naturalH:e.target.value}))} placeholder="H" className="w-full px-1.5 py-1 text-[10px] font-mono rounded border border-[#DDD7C7] focus:outline-none focus:border-[#1A614F]"/>
-                      </div>
+              <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-[#15302A] truncate">{item.name||"Untitled"}</p>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {item.fileFormat&&<span className="text-[9px] font-bold px-1 rounded bg-slate-100 text-slate-500">{item.fileFormat}</span>}
+                      {item.fileSize&&<span className="text-[9px] text-[#9FC1B5]">{item.fileSize}</span>}
+                      {(item.naturalW&&item.naturalH)&&<span className="text-[9px] text-[#9FC1B5]">{item.naturalW}×{item.naturalH}px</span>}
                     </div>
+                    <p className="text-[9px] text-[#C9C9C9] mt-0.5">{formatDate(item.addedAt)}</p>
                   </div>
-                  <div className="flex gap-1.5"><button onClick={()=>saveEdit(item.url)} className="flex-1 py-1 rounded text-[10px] font-bold text-white" style={{background:"#1A614F"}}>Save</button>
-                    <button onClick={()=>setEditingUrl(null)} className="flex-1 py-1 rounded text-[10px] font-semibold border border-[#DDD7C7] text-[#5B6B63]">Cancel</button></div>
+                  <button onClick={()=>setViewingItem(item)} className="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded border border-[#DDD7C7] text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">View</button>
                 </div>
-              ):(
-                <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold text-[#15302A] truncate">{item.name||"Untitled"}</p>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {item.fileFormat&&<span className="text-[9px] font-bold px-1 rounded bg-slate-100 text-slate-500">{item.fileFormat}</span>}
-                        {item.fileSize&&<span className="text-[9px] text-[#9FC1B5]">{item.fileSize}</span>}
-                        {(item.naturalW&&item.naturalH)&&<span className="text-[9px] text-[#9FC1B5]">{item.naturalW}×{item.naturalH}px</span>}
-                      </div>
-                      <p className="text-[9px] text-[#C9C9C9] mt-0.5">{formatDate(item.addedAt)}</p>
-                    </div>
-                    <button onClick={()=>openEdit(item)} className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[#9FC1B5] hover:text-[#1A614F] hover:bg-[#EAF4EF]"><Edit3 size={11}/></button>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           ))}
         </div>
@@ -2195,22 +2090,51 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setPreview(null)}>
           <div className="bg-white rounded-2xl overflow-hidden shadow-2xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <img src={preview.url} alt={preview.name} className="w-full max-h-[60vh] object-contain bg-[#F4F1E8]" />
-            <div className="p-4 space-y-2">
-              <p className="font-bold text-[#15302A] text-[14px]">{preview.name}</p>
-              <p className="text-[12px] text-[#646970] font-mono break-all">{preview.url}</p>
+            <div className="p-4 flex gap-2">
+              <button onClick={() => copyUrl(preview.url)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF]">
+                {copied === preview.url ? <><CheckCircle size={13}/> Copied!</> : <><LinkIcon size={13}/> Copy URL</>}
+              </button>
+              <button onClick={() => { deleteItem(preview.url); setPreview(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-red-300 text-red-500 hover:bg-red-50">Remove</button>
+              <button onClick={() => setPreview(null)} className="ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#F4F1E8] text-[#5B6B63]">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View detail modal */}
+      {viewingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setViewingItem(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <img src={viewingItem.url} alt={viewingItem.name} className="w-full max-h-56 object-cover bg-[#F4F1E8]" />
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[16px] font-extrabold text-[#15302A]">File details</h3>
+                <button onClick={() => setViewingItem(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 font-bold text-lg">×</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["Filename",   viewingItem.name || "—"],
+                  ["Format",     viewingItem.fileFormat || "—"],
+                  ["File size",  viewingItem.fileSize || (viewingItem.size ? formatSize(viewingItem.size) : "—")],
+                  ["Dimensions", (viewingItem.naturalW && viewingItem.naturalH) ? `${viewingItem.naturalW} × ${viewingItem.naturalH} px` : "—"],
+                  ["Type",       viewingItem.type === "featured" ? "Featured image" : "Content image"],
+                  ["Added",      viewingItem.addedAt ? formatDate(viewingItem.addedAt) : "—"],
+                ].map(([label, value]) => (
+                  <div key={label} className="bg-[#F4F1E8] rounded-xl px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-[#9FC1B5] uppercase tracking-wide mb-0.5">{label}</p>
+                    <p className="text-[13px] font-semibold text-[#15302A] break-all">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#F4F1E8] rounded-xl px-3 py-2.5">
+                <p className="text-[10px] font-bold text-[#9FC1B5] uppercase tracking-wide mb-0.5">URL</p>
+                <p className="text-[11px] font-mono text-[#1A614F] break-all">{viewingItem.url}</p>
+              </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={() => copyUrl(preview.url)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
-                  {copied === preview.url ? <><CheckCircle size={13} /> Copied!</> : <><LinkIcon size={13} /> Copy URL</>}
+                <button onClick={() => copyUrl(viewingItem.url)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
+                  {copied === viewingItem.url ? <><CheckCircle size={14}/> Copied!</> : <><LinkIcon size={14}/> Copy URL</>}
                 </button>
-                <button onClick={() => { deleteItem(preview.url); setPreview(null); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-red-300 text-red-500 hover:bg-red-50 transition-colors">
-                  Remove from library
-                </button>
-                <button onClick={() => setPreview(null)}
-                  className="ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#F4F1E8] text-[#5B6B63] hover:bg-[#E6E1D3] transition-colors">
-                  Close
-                </button>
+                <button onClick={() => { deleteItem(viewingItem.url); setViewingItem(null); }} className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-colors">Remove</button>
               </div>
             </div>
           </div>
