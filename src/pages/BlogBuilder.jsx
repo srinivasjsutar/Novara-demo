@@ -1989,8 +1989,7 @@ function BlogEditor({ editingBlog, onBack }) {
                 {showDrafts && (
                   <div className="p-3 space-y-2">
                     <div className="flex gap-2">
-                      <button onClick={saveDraft} className="wp-secondary flex-1">Save draft</button>
-                      <button onClick={downloadExcel} className="wp-secondary flex-1 flex items-center justify-center gap-1"><Upload size={12} /> Excel</button>
+                      <button onClick={downloadExcel} className="wp-secondary w-full flex items-center justify-center gap-1"><Upload size={12} /> Export Excel</button>
                     </div>
                     <div className="space-y-1.5 max-h-48 overflow-auto row-scroll">
                       {drafts.length === 0 && <p className="text-[12px] text-[#646970]">No saved drafts.</p>}
@@ -2294,19 +2293,6 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
         <button onClick={exportUsersExcel} disabled={users.length===0} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#DDD7C7] text-[#5B6B63] hover:bg-[#EAF4EF] hover:text-[#1A614F] hover:border-[#1A614F] transition-all disabled:opacity-40"><Upload size={12}/> Export Excel</button>
       </div>
       <p className="text-[13px] text-[#646970] -mt-4">Manage who can access the blog builder and what they can do.</p>
-
-      {/* Role legend */}
-      <div className="flex flex-wrap gap-3">
-        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-          <div key={role} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px]" style={{ background: cfg.bg, borderColor: cfg.color + "33" }}>
-            <span>{cfg.icon}</span>
-            <div>
-              <div className="font-bold" style={{ color: cfg.color }}>{cfg.label}</div>
-              <div className="text-[10px] text-slate-500">{cfg.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {banner && <div className={`text-[12px] font-semibold px-3 py-2 rounded-lg ${banner.type === "ok" ? "bg-[#E9FFF3] text-[#1B9A63]" : "bg-red-50 text-red-600"}`}>{banner.msg}</div>}
 
