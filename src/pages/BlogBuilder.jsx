@@ -1406,7 +1406,7 @@ function BlogEditor({ editingBlog, onBack }) {
               <div className="flex-1 min-w-0" />
             ) : activeNav === "media" ? (
               <div className="flex-1 min-w-0">
-                <MediaLibraryPage mediaLibrary={mediaLibrary} setMediaLibrary={setMediaLibrary} MEDIA_KEY={MEDIA_KEY} />
+                <MediaLibraryPage meta={meta} bodyRef={bodyRef} />
               </div>
             ) : activeNav === "users" ? (
               <div className="flex-1 min-w-0">
@@ -1977,29 +1977,68 @@ function BlogEditor({ editingBlog, onBack }) {
 }
 
 // ─── Media Library Page ────────────────────────────────────────────────────────
-function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
-  const [query, setQuery]           = useState("");
-  const [filter, setFilter]         = useState("all");
-  const [copied, setCopied]         = useState(null);
-  const [preview, setPreview]       = useState(null);
+function MediaLibraryPage({ meta, bodyRef }) {
+  const [query, setQuery]             = useState("");
+  const [copied, setCopied]           = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
 
-  const filtered = mediaLibrary.filter((m) => {
-    const matchQ = !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase());
-    const matchF = filter === "all" || m.type === filter;
-    return matchQ && matchF;
-  });
+  // Derive current blog images from meta (featured) + editor body (content)
+  const currentImages = useMemo(() => {
+    const imgs = [];
+    // Featured image
+    if (meta?.heroImage) {
+      const url = meta.heroImage;
+      const parts = url.split("/"); const raw = parts[parts.length - 1] || "";
+      const filename = raw.split("?")[0];
+      const ext = filename.split(".").pop().toUpperCase();
+      imgs.push({ url, type: "featured", name: filename, fileFormat: ext, fileSize: "", naturalW: "", naturalH: "" });
+    }
+    // Content images from editor body
+    if (bodyRef?.current) {
+      const imgEls = bodyRef.current.querySelectorAll("img");
+      imgEls.forEach((img) => {
+        const url = img.getAttribute("src");
+        if (!url || imgs.find((m) => m.url === url)) return;
+        const parts = url.split("/"); const raw = parts[parts.length - 1] || "";
+        const filename = raw.split("?")[0];
+        const ext = filename.split(".").pop().toUpperCase();
+        imgs.push({
+          url, type: "content",
+          name: img.getAttribute("data-filename") || filename,
+          fileFormat: img.getAttribute("data-format") || ext,
+          fileSize: img.getAttribute("data-filesize") || "",
+          naturalW: img.getAttribute("data-width") || String(img.naturalWidth || ""),
+          naturalH: img.getAttribute("data-height") || String(img.naturalHeight || ""),
+        });
+      });
+    }
+    return imgs;
+  }, [meta?.heroImage, bodyRef?.current?.innerHTML]);
+
+  // Auto-detect naturalW/H for images that don't have them yet
+  const [dims, setDims] = useState({});
+  useEffect(() => {
+    currentImages.forEach(({ url, naturalW, naturalH }) => {
+      if ((!naturalW || !naturalH) && !dims[url]) {
+        const img = new window.Image();
+        img.onload = () => setDims((p) => ({ ...p, [url]: { w: String(img.naturalWidth), h: String(img.naturalHeight) } }));
+        img.src = url;
+      }
+    });
+  }, [currentImages]);
+
+  const enriched = currentImages.map((m) => ({
+    ...m,
+    naturalW: m.naturalW || dims[m.url]?.w || "",
+    naturalH: m.naturalH || dims[m.url]?.h || "",
+  }));
+
+  const filtered = enriched.filter((m) =>
+    !query || m.name?.toLowerCase().includes(query.toLowerCase()) || m.url?.toLowerCase().includes(query.toLowerCase())
+  );
 
   const copyUrl = (url) => {
     navigator.clipboard.writeText(url).then(() => { setCopied(url); setTimeout(() => setCopied(null), 2000); });
-  };
-
-  const deleteItem = (url) => {
-    setMediaLibrary((prev) => {
-      const next = prev.filter((m) => m.url !== url);
-      try { localStorage.setItem(MEDIA_KEY, JSON.stringify(next)); } catch (_) {}
-      return next;
-    });
   };
 
   const formatSize = (bytes) => {
@@ -2021,26 +2060,16 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
         <div className="flex items-center gap-2">
           <MediaIcon size={18} className="text-[#1A614F]" />
           <h2 className="text-[18px] font-extrabold text-[#15302A]">Media Library</h2>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{mediaLibrary.length} files</span>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#E9FFF3", color: "#1B9A63" }}>{enriched.length} files</span>
         </div>
       </div>
-      <p className="text-[13px] text-[#646970] -mt-3">All images uploaded through the blog builder — featured images and content images — are stored here.</p>
+      <p className="text-[13px] text-[#646970] -mt-3">Images in the currently open blog — featured image and content images from the editor.</p>
 
-      {/* Filters + search */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex rounded-lg overflow-hidden border border-[#DDD7C7] text-[12px] font-semibold">
-          {[["all", "All"], ["featured", "Featured"], ["content", "Content"]].map(([val, lbl]) => (
-            <button key={val} onClick={() => setFilter(val)}
-              className={`px-3 py-1.5 transition-colors ${filter === val ? "bg-[#1A614F] text-white" : "bg-white text-[#5B6B63] hover:bg-[#EAF4EF]"}`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by filename or URL…"
-            className="w-full pl-8 pr-3 py-1.5 text-[12px] rounded-lg border border-[#DDD7C7] bg-white focus:outline-none focus:border-[#1A614F]" />
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by filename or URL…"
+          className="w-full pl-8 pr-3 py-1.5 text-[12px] rounded-lg border border-[#DDD7C7] bg-white focus:outline-none focus:border-[#1A614F]" />
       </div>
 
       {/* Grid */}
@@ -2050,7 +2079,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
             <MediaIcon size={28} className="text-[#C9C9C9]" />
           </div>
           <p className="text-[15px] font-bold text-[#5B6B63]">No media yet</p>
-          <p className="text-[13px] text-[#9FC1B5] mt-1">Images from your blogs will appear here automatically.</p>
+          <p className="text-[13px] text-[#9FC1B5] mt-1">Add a featured image or insert images into the editor — they will appear here.</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-[13px] text-[#646970]">No media matches your search.</div>
@@ -2063,7 +2092,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
                 <div className="absolute top-2 left-2"><span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{background:item.type==="featured"?"#FBF1D2":"#E9FFF3",color:item.type==="featured"?"#9a6b00":"#1B9A63"}}>{item.type==="featured"?"Featured":"Content"}</span></div>
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <button onClick={(e)=>{e.stopPropagation();copyUrl(item.url);}} className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-[#1A614F] hover:bg-white">{copied===item.url?<CheckCircle size={15} className="text-[#1B9A63]"/>:<LinkIcon size={15}/>}</button>
-                  <button onClick={(e)=>{e.stopPropagation();deleteItem(item.url);}} className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-red-500 hover:bg-white"><span className="font-bold text-[16px] leading-none">×</span></button>
+
                 </div>
               </div>
               <div className="px-2 py-1.5 bg-white border-t border-[#E6E1D3]">
@@ -2094,7 +2123,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
               <button onClick={() => copyUrl(preview.url)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF]">
                 {copied === preview.url ? <><CheckCircle size={13}/> Copied!</> : <><LinkIcon size={13}/> Copy URL</>}
               </button>
-              <button onClick={() => { deleteItem(preview.url); setPreview(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-red-300 text-red-500 hover:bg-red-50">Remove</button>
+
               <button onClick={() => setPreview(null)} className="ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#F4F1E8] text-[#5B6B63]">Close</button>
             </div>
           </div>
@@ -2134,7 +2163,7 @@ function MediaLibraryPage({ mediaLibrary, setMediaLibrary, MEDIA_KEY }) {
                 <button onClick={() => copyUrl(viewingItem.url)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF] transition-colors">
                   {copied === viewingItem.url ? <><CheckCircle size={14}/> Copied!</> : <><LinkIcon size={14}/> Copy URL</>}
                 </button>
-                <button onClick={() => { deleteItem(viewingItem.url); setViewingItem(null); }} className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-colors">Remove</button>
+
               </div>
             </div>
           </div>
