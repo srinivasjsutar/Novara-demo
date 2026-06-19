@@ -2073,7 +2073,7 @@ function MediaLibraryPage({ meta, bodyRef }) {
       </div>
 
       {/* Grid */}
-      {enriched.length === 0 ? (
+      {mediaLibrary.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#F4F1E8" }}>
             <MediaIcon size={28} className="text-[#C9C9C9]" />
@@ -2087,7 +2087,7 @@ function MediaLibraryPage({ meta, bodyRef }) {
         <div className="grid grid-cols-3 gap-4">
           {filtered.map((item) => (
             <div key={item.url} className="rounded-xl overflow-hidden border border-[#E6E1D3] bg-[#F4F1E8]">
-              <div className="aspect-video overflow-hidden relative group cursor-pointer" onClick={()=>setViewingItem(item)}>
+              <div className="aspect-video overflow-hidden relative group cursor-pointer" onClick={()=>setPreview(item)}>
                 <img src={item.url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
                 <div className="absolute top-2 left-2"><span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{background:item.type==="featured"?"#FBF1D2":"#E9FFF3",color:item.type==="featured"?"#9a6b00":"#1B9A63"}}>{item.type==="featured"?"Featured":"Content"}</span></div>
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -2115,13 +2115,13 @@ function MediaLibraryPage({ meta, bodyRef }) {
       )}
 
       {/* Preview lightbox */}
-      {preview && (
+      {viewingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setViewingItem(null)}>
           <div className="bg-white rounded-2xl overflow-hidden shadow-2xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <img src={preview.url} alt={preview.name} className="w-full max-h-[60vh] object-contain bg-[#F4F1E8]" />
+            <img src={viewingItem.url} alt={viewingItem.name} className="w-full max-h-[60vh] object-contain bg-[#F4F1E8]" />
             <div className="p-4 flex gap-2">
-              <button onClick={() => copyUrl(preview.url)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF]">
-                {copied === preview.url ? <><CheckCircle size={13}/> Copied!</> : <><LinkIcon size={13}/> Copy URL</>}
+              <button onClick={() => copyUrl(viewingItem.url)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-[#1A614F] text-[#1A614F] hover:bg-[#EAF4EF]">
+                {copied === viewingItem.url ? <><CheckCircle size={13}/> Copied!</> : <><LinkIcon size={13}/> Copy URL</>}
               </button>
 
               <button onClick={() => setViewingItem(null)} className="ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[#F4F1E8] text-[#5B6B63]">Close</button>
