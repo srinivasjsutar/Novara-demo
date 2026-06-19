@@ -2360,7 +2360,6 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
                   <span className="text-[11px] text-[#646970]">{u.addedOn || "—"}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => openEdit(u)} title="Edit" className="text-[#1A614F] hover:opacity-70"><Edit3 size={14} /></button>
-                    <button onClick={() => deleteUser(u)} disabled={busy} title="Remove" className="text-red-500 hover:opacity-70 font-bold text-[16px] leading-none">×</button>
                   </div>
                 </div>
               );
@@ -2422,6 +2421,12 @@ function UsersPanel({ ghToken, ghRepo, ghBranch }) {
               </button>
               <button onClick={() => setEditUser(null)} className="px-4 py-2.5 rounded-xl border border-[#DDD7C7] text-[#5B6B63] font-semibold text-[13px] hover:bg-[#F4F1E8] transition-colors">
                 Cancel
+              </button>
+            </div>
+            <div className="border-t border-[#F0EBE0] pt-3">
+              <button onClick={() => { setEditUser(null); deleteUser(editUser); }} disabled={busy}
+                className="w-full py-2 rounded-xl border border-red-200 text-red-500 font-semibold text-[13px] hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                Remove account
               </button>
             </div>
           </div>
